@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Парсинг TXT файла",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "file_b64": "0J/RgNC40LLQtdGCINC80LjRgA==",
+        "filename": "test.txt"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "text": "Привет мир" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Ошибка при пустом теле",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 400
+    },
+    {
+      "name": "Неподдерживаемый формат",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "file_b64": "dGVzdA==",
+        "filename": "file.mp4"
+      },
+      "expectedStatus": 415
+    }
+  ]
+}

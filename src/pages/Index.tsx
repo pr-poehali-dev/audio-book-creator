@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
 const TTS_URL = "https://functions.poehali.dev/ce35a220-1add-443c-976f-1406e37ffb0e";
+const PARSE_URL = "https://functions.poehali.dev/6eb61321-5f6e-40f3-b5ba-2e1a9fe7dfcc";
+const SUPPORTED_EXTS = ["txt", "pdf", "epub", "docx"];
 
 const VOICES = [
   { id: "alena", name: "Алёна", gender: "Женский", style: "Нейтральный", emoji: "👩" },
@@ -43,6 +45,7 @@ export default function App() {
   const [voice, setVoice] = useState("alena");
   const [speed, setSpeed] = useState(1.0);
   const [dragging, setDragging] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [resultUrl, setResultUrl] = useState("");
   const [resultId, setResultId] = useState("");
@@ -53,19 +56,54 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    setTitle(file.name.replace(/\.[^.]+$/, ""));
-    const reader = new FileReader();
-    reader.onload = (e) => setText(e.target?.result as string);
-    reader.readAsText(file, "UTF-8");
-  };
+  const handleFile = useCallback(async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    setTitle(baseName);
+    setError("");
+
+    if (!SUPPORTED_EXTS.includes(ext)) {
+      setError(`Формат .${ext} не поддерживается. Используйте: ${SUPPORTED_EXTS.join(", ")}`);
+      return;
+    }
+
+    if (ext === "txt") {
+      const reader = new FileReader();
+      reader.onload = (e) => setText(e.target?.result as string);
+      reader.readAsText(file, "UTF-8");
+      return;
+    }
+
+    // PDF / EPUB / DOCX — отправляем на бэкенд
+    setParsing(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+      const file_b64 = btoa(binary);
+
+      const res = await fetch(PARSE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_b64, filename: file.name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка при чтении файла");
+      setText(data.text);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Не удалось прочитать файл");
+    } finally {
+      setParsing(false);
+    }
+  }, []);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
-  }, []);
+  }, [handleFile]);
 
   const generate = async () => {
     if (!text.trim()) { setError("Добавьте текст для озвучки"); return; }
@@ -212,7 +250,7 @@ export default function App() {
                 <h2 className="text-3xl font-bold text-center text-[#1a2033] mb-12">Как это работает</h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   {[
-                    { step: "1", icon: "Upload", title: "Загрузите текст", desc: "Вставьте текст вручную или загрузите файл .txt" },
+                    { step: "1", icon: "Upload", title: "Загрузите файл", desc: "Поддерживаются PDF, EPUB, DOCX и TXT — или вставьте текст вручную" },
                     { step: "2", icon: "SlidersHorizontal", title: "Настройте голос", desc: "Выберите диктора, скорость и интонацию" },
                     { step: "3", icon: "Download", title: "Скачайте MP3", desc: "Получите готовый аудиофайл за 30–60 секунд" },
                   ].map((s) => (
@@ -275,7 +313,7 @@ export default function App() {
                   <label className="block text-sm font-semibold text-[#1a2033] mb-3">Текст для озвучки</label>
 
                   {/* Drop zone */}
-                  {!text && (
+                  {!text && !parsing && (
                     <div
                       onDragOver={e => { e.preventDefault(); setDragging(true); }}
                       onDragLeave={() => setDragging(false)}
@@ -287,8 +325,21 @@ export default function App() {
                     >
                       <Icon name="Upload" size={32} className="text-[#94a3b8] mx-auto mb-3" />
                       <p className="font-semibold text-[#475569]">Перетащите файл или нажмите для выбора</p>
-                      <p className="text-sm text-[#94a3b8] mt-1">.txt файлы</p>
-                      <input ref={fileRef} type="file" accept=".txt" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                      <div className="flex justify-center gap-2 mt-2 flex-wrap">
+                        {["TXT", "PDF", "EPUB", "DOCX"].map(f => (
+                          <span key={f} className="text-xs bg-blue-50 text-blue-500 border border-blue-100 px-2 py-0.5 rounded-full font-medium">{f}</span>
+                        ))}
+                      </div>
+                      <input ref={fileRef} type="file" accept=".txt,.pdf,.epub,.docx" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                    </div>
+                  )}
+
+                  {/* Parsing indicator */}
+                  {parsing && (
+                    <div className="border-2 border-blue-200 bg-blue-50 rounded-xl p-10 text-center mb-4">
+                      <Icon name="Loader2" size={32} className="text-blue-400 mx-auto mb-3 animate-spin" />
+                      <p className="font-semibold text-[#475569]">Читаю файл...</p>
+                      <p className="text-sm text-[#94a3b8] mt-1">Извлекаю текст из документа</p>
                     </div>
                   )}
 
