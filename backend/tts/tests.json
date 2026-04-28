@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get projects empty list",
+      "method": "GET",
+      "path": "/?user_id=test_user_123",
+      "expectedStatus": 200,
+      "expectedBody": {"projects": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

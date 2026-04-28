@@ -1,404 +1,561 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
-const GENRES = ["Все", "Детские сказки", "Приключения", "Классика", "Фантастика", "Поэзия", "Самиздат"];
+const TTS_URL = "https://functions.poehali.dev/ce35a220-1add-443c-976f-1406e37ffb0e";
 
-const BOOKS = [
-  {
-    id: 1,
-    title: "Колобок",
-    author: "Русская народная сказка",
-    genre: "Детские сказки",
-    duration: "12 мин",
-    age: "3+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/5adeb18c-6d01-4d58-a0b9-7f70ee953953.jpg",
-    color: "from-amber-400 to-orange-500",
-    rating: 4.9,
-  },
-  {
-    id: 2,
-    title: "Маленький принц",
-    author: "Антуан де Сент-Экзюпери",
-    genre: "Классика",
-    duration: "2 ч 40 мин",
-    age: "8+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/8209df6c-1446-45d3-82d0-136bdaa4a0f4.jpg",
-    color: "from-indigo-400 to-violet-600",
-    rating: 5.0,
-  },
-  {
-    id: 3,
-    title: "Три медведя",
-    author: "Лев Толстой",
-    genre: "Детские сказки",
-    duration: "18 мин",
-    age: "3+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/5adeb18c-6d01-4d58-a0b9-7f70ee953953.jpg",
-    color: "from-emerald-400 to-teal-600",
-    rating: 4.8,
-  },
-  {
-    id: 4,
-    title: "Мастер и Маргарита",
-    author: "Михаил Булгаков",
-    genre: "Классика",
-    duration: "14 ч 20 мин",
-    age: "16+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/8209df6c-1446-45d3-82d0-136bdaa4a0f4.jpg",
-    color: "from-rose-500 to-red-700",
-    rating: 4.9,
-  },
-  {
-    id: 5,
-    title: "Приключения Буратино",
-    author: "Алексей Толстой",
-    genre: "Приключения",
-    duration: "3 ч 15 мин",
-    age: "5+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/5adeb18c-6d01-4d58-a0b9-7f70ee953953.jpg",
-    color: "from-yellow-400 to-amber-600",
-    rating: 4.7,
-  },
-  {
-    id: 6,
-    title: "Моя первая сказка",
-    author: "Анна Петрова",
-    genre: "Самиздат",
-    duration: "25 мин",
-    age: "4+",
-    cover: "https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/91881a82-f1ec-47c3-a4e6-9b872669e27c.jpg",
-    color: "from-pink-400 to-fuchsia-600",
-    rating: 4.6,
-  },
+const VOICES = [
+  { id: "alena", name: "Алёна", gender: "Женский", style: "Нейтральный", emoji: "👩" },
+  { id: "jane",  name: "Джейн",  gender: "Женский", style: "Эмоциональный", emoji: "👩‍🦰" },
+  { id: "madirus", name: "Мадирус", gender: "Женский", style: "Спокойный", emoji: "👩‍🦱" },
+  { id: "filipp", name: "Филипп", gender: "Мужской", style: "Нейтральный", emoji: "👨" },
+  { id: "ermil", name: "Ермил", gender: "Мужской", style: "Тёплый", emoji: "👨‍🦳" },
+  { id: "zahar",  name: "Захар",  gender: "Мужской", style: "Серьёзный", emoji: "👨‍💼" },
 ];
 
-const STATS = [
-  { value: "1 200+", label: "Аудиокниг" },
-  { value: "340+", label: "Авторов" },
-  { value: "58 000", label: "Слушателей" },
-  { value: "12", label: "Жанров" },
+const USE_CASES = [
+  { icon: "GraduationCap", title: "Для студентов", desc: "Слушайте учебники и статьи на ходу" },
+  { icon: "Car", title: "За рулём", desc: "Превращайте документы в подкасты для дороги" },
+  { icon: "Eye", title: "Для зрения", desc: "Комфортное восприятие без нагрузки на глаза" },
+  { icon: "PenLine", title: "Для писателей", desc: "Услышьте свой текст со стороны" },
 ];
 
-export default function Index() {
-  const [activeGenre, setActiveGenre] = useState("Все");
-  const [playingId, setPlayingId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"library" | "studio">("library");
+type Screen = "home" | "editor" | "generating" | "result" | "cabinet";
 
-  const filtered = activeGenre === "Все" ? BOOKS : BOOKS.filter((b) => b.genre === activeGenre);
+interface Project {
+  id: string;
+  title: string;
+  audio_url: string;
+  created_at: string;
+  status: string;
+  duration_sec?: number;
+}
+
+const USER_ID = "user_" + (localStorage.getItem("uid") || (() => {
+  const id = Math.random().toString(36).slice(2);
+  localStorage.setItem("uid", id);
+  return id;
+})());
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("home");
+  const [text, setText] = useState("");
+  const [title, setTitle] = useState("Моя аудиокнига");
+  const [voice, setVoice] = useState("alena");
+  const [speed, setSpeed] = useState(1.0);
+  const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [resultUrl, setResultUrl] = useState("");
+  const [resultId, setResultId] = useState("");
+  const [error, setError] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingCabinet, setLoadingCabinet] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    setTitle(file.name.replace(/\.[^.]+$/, ""));
+    const reader = new FileReader();
+    reader.onload = (e) => setText(e.target?.result as string);
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }, []);
+
+  const generate = async () => {
+    if (!text.trim()) { setError("Добавьте текст для озвучки"); return; }
+    setError("");
+    setScreen("generating");
+    setProgress(0);
+
+    const tick = setInterval(() => setProgress(p => Math.min(p + Math.random() * 8, 88)), 600);
+
+    try {
+      const res = await fetch(TTS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 5000), voice_id: voice, speed, user_id: USER_ID, title }),
+      });
+      clearInterval(tick);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Ошибка генерации");
+      setProgress(100);
+      setResultUrl(data.audio_url);
+      setResultId(data.project_id);
+      setTimeout(() => setScreen("result"), 400);
+    } catch (e: unknown) {
+      clearInterval(tick);
+      setError(e instanceof Error ? e.message : "Произошла ошибка");
+      setScreen("editor");
+    }
+  };
+
+  const loadCabinet = async () => {
+    setLoadingCabinet(true);
+    setScreen("cabinet");
+    try {
+      const res = await fetch(`${TTS_URL}?user_id=${USER_ID}`);
+      const data = await res.json();
+      setProjects(data.projects || []);
+    } catch {
+      setProjects([]);
+    }
+    setLoadingCabinet(false);
+  };
+
+  const deleteProject = async (id: string) => {
+    await fetch(`${TTS_URL}?project_id=${id}`, { method: "DELETE" });
+    setProjects(p => p.filter(x => x.id !== id));
+  };
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0d0a06] text-[#f0e8d8] font-golos overflow-x-hidden">
+    <div className="min-h-screen bg-[#f4f6f9] text-[#1a2033] font-ibm">
 
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between"
-        style={{ background: "linear-gradient(to bottom, rgba(13,10,6,0.97) 0%, transparent 100%)" }}>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">📖</span>
-          <span className="font-bold text-xl tracking-tight text-[#f0e8d8]">СказкоФон</span>
-        </div>
-        <nav className="hidden md:flex items-center gap-1 bg-white/5 rounded-full px-2 py-1 border border-white/10">
-          {["library", "studio"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as "library" | "studio")}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                activeTab === tab
-                  ? "bg-[#c8913a] text-[#0d0a06]"
-                  : "text-[#a89878] hover:text-[#f0e8d8]"
-              }`}
-            >
-              {tab === "library" ? "Библиотека" : "Студия"}
-            </button>
-          ))}
-        </nav>
-        <button className="bg-[#c8913a] hover:bg-[#e0a846] text-[#0d0a06] font-semibold px-5 py-2 rounded-full text-sm transition-all duration-200 hover:scale-105">
-          Войти
+      {/* Navbar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#e5e9f0] px-6 py-3 flex items-center justify-between shadow-sm">
+        <button onClick={() => setScreen("home")} className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center">
+            <Icon name="BookAudio" fallback="BookOpen" size={16} className="text-white" />
+          </div>
+          <span className="font-bold text-[#1a2033]">АудиоКнига Мастер</span>
         </button>
-      </header>
-
-      {/* Hero */}
-      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-[#c8913a]/10 rounded-full blur-[120px]" />
-          <div className="absolute top-20 right-10 w-[300px] h-[300px] bg-amber-800/10 rounded-full blur-[80px]" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadCabinet}
+            className="flex items-center gap-2 text-sm text-[#64748b] hover:text-[#3b82f6] px-3 py-2 rounded-lg hover:bg-blue-50 transition-all"
+          >
+            <Icon name="FolderOpen" size={16} />
+            <span className="hidden sm:inline">Мои книги</span>
+          </button>
+          <button
+            onClick={() => { setText(""); setTitle("Моя аудиокнига"); setScreen("editor"); }}
+            className="flex items-center gap-2 text-sm bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold px-4 py-2 rounded-lg transition-all hover:shadow-md"
+          >
+            <Icon name="Plus" size={16} />
+            Создать
+          </button>
         </div>
+      </nav>
 
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center gap-12">
-            <div className="flex-1 animate-fade-in">
-              <div className="inline-flex items-center gap-2 bg-[#c8913a]/15 border border-[#c8913a]/30 rounded-full px-4 py-1.5 text-sm text-[#c8913a] mb-6">
-                <span className="w-2 h-2 rounded-full bg-[#c8913a] animate-pulse" />
-                Для детей и взрослых
-              </div>
-              <h1 className="text-5xl md:text-6xl font-bold leading-tight text-[#f0e8d8] mb-6">
-                Сказки и книги
-                <br />
-                <span style={{
-                  background: "linear-gradient(135deg, #c8913a, #f0c060)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text"
-                }}>голосом и сердцем</span>
-              </h1>
-              <p className="text-[#a89878] text-lg leading-relaxed mb-8 max-w-lg">
-                Тысячи аудиокниг для детей и взрослых. Слушайте любимые сказки,
-                создавайте собственные произведения и озвучивайте истории своим голосом.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <button className="flex items-center gap-2 bg-[#c8913a] hover:bg-[#e0a846] text-[#0d0a06] font-bold px-7 py-3.5 rounded-full transition-all duration-200 hover:scale-105 hover:shadow-[0_0_30px_rgba(200,145,58,0.4)]">
-                  <Icon name="Play" size={18} />
-                  Слушать сейчас
-                </button>
-                <button className="flex items-center gap-2 border border-white/20 hover:border-[#c8913a]/50 text-[#f0e8d8] px-7 py-3.5 rounded-full transition-all duration-200 hover:bg-white/5">
-                  <Icon name="Mic" size={18} />
-                  Создать книгу
-                </button>
-              </div>
-            </div>
+      <div className="pt-16">
 
-            {/* Hero image */}
-            <div className="relative flex-shrink-0 animate-fade-in stagger-3">
-              <div className="w-72 h-72 rounded-3xl overflow-hidden shadow-2xl shadow-amber-900/30 border border-white/10">
-                <img
-                  src="https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/5adeb18c-6d01-4d58-a0b9-7f70ee953953.jpg"
-                  alt="Детская аудиокнига"
-                  className="w-full h-full object-cover"
-                />
+        {/* HOME */}
+        {screen === "home" && (
+          <div>
+            {/* Hero */}
+            <section className="relative overflow-hidden bg-gradient-to-br from-[#eef2ff] via-[#f4f6f9] to-[#eff6ff] px-6 py-24 text-center">
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-10 left-1/4 w-72 h-72 bg-blue-200/40 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 right-1/4 w-96 h-60 bg-indigo-200/30 rounded-full blur-3xl" />
               </div>
-              {/* Floating badge */}
-              <div className="absolute -bottom-4 -left-6 bg-[#1a1408] border border-[#c8913a]/30 rounded-2xl px-4 py-3 shadow-xl animate-float">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-lg">🎧</div>
-                  <div>
-                    <div className="text-xs text-[#a89878]">Сейчас слушают</div>
-                    <div className="text-sm font-semibold text-[#f0e8d8]">1 247 человек</div>
-                  </div>
+              <div className="relative max-w-3xl mx-auto animate-fade-in">
+                <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 rounded-full px-4 py-1.5 text-sm font-medium mb-8">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  Синтез речи нейросетью
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 animate-fade-in stagger-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="bg-white/3 border border-white/8 rounded-2xl p-5 text-center hover:border-[#c8913a]/30 transition-colors">
-                <div className="text-3xl font-bold text-[#c8913a] mb-1">{s.value}</div>
-                <div className="text-sm text-[#a89878]">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Library */}
-      {activeTab === "library" && (
-        <section className="px-6 pb-20">
-          <div className="max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-[#f0e8d8]">Каталог книг</h2>
-              <button className="text-sm text-[#c8913a] hover:text-[#e0a846] flex items-center gap-1 transition-colors">
-                Все книги <Icon name="ChevronRight" size={16} />
-              </button>
-            </div>
-
-            {/* Genre filter */}
-            <div className="flex gap-2 flex-wrap mb-8">
-              {GENRES.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setActiveGenre(g)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                    activeGenre === g
-                      ? "bg-[#c8913a] text-[#0d0a06]"
-                      : "bg-white/5 border border-white/10 text-[#a89878] hover:text-[#f0e8d8] hover:border-white/20"
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-
-            {/* Books grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {filtered.map((book, i) => (
-                <div
-                  key={book.id}
-                  className="group bg-white/3 border border-white/8 rounded-2xl overflow-hidden hover:border-[#c8913a]/40 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(200,145,58,0.15)] cursor-pointer animate-fade-in"
-                  style={{ animationDelay: `${i * 0.06}s` }}
-                >
-                  <div className="relative aspect-[3/4] overflow-hidden">
-                    <img
-                      src={book.cover}
-                      alt={book.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                    <div className="absolute top-3 left-3">
-                      <span className="bg-black/50 backdrop-blur-sm text-[#f0e8d8] text-xs px-2 py-1 rounded-full border border-white/10">
-                        {book.age}
-                      </span>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setPlayingId(playingId === book.id ? null : book.id); }}
-                      className={`absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-                        playingId === book.id
-                          ? "bg-[#c8913a] text-[#0d0a06]"
-                          : "bg-black/60 text-white hover:bg-[#c8913a] hover:text-[#0d0a06]"
-                      } backdrop-blur-sm border border-white/20`}
-                    >
-                      <Icon name={playingId === book.id ? "Pause" : "Play"} size={16} />
-                    </button>
-                    {playingId === book.id && (
-                      <div className="absolute bottom-3 left-3 flex items-end gap-0.5 h-5">
-                        {[1,2,3,4].map((n) => (
-                          <div key={n} className={`w-1 bg-[#c8913a] rounded-full wave-bar`}
-                            style={{ height: `${50 + n * 12}%`, animationDelay: `${n * 0.15}s` }} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-[#f0e8d8] mb-1 truncate">{book.title}</h3>
-                    <p className="text-xs text-[#a89878] mb-3 truncate">{book.author}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-xs text-[#a89878]">
-                        <Icon name="Clock" size={12} />
-                        {book.duration}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-amber-400">
-                        ★ {book.rating}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Studio */}
-      {activeTab === "studio" && (
-        <section className="px-6 pb-20">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-8 items-center mb-16">
-              <div className="animate-fade-in">
-                <h2 className="text-3xl font-bold text-[#f0e8d8] mb-4">
-                  Студия записи
-                </h2>
-                <p className="text-[#a89878] leading-relaxed mb-6">
-                  Создайте свою аудиокнигу: загрузите текст, выберите голос или запишите сами.
-                  Озвучьте любимую сказку для своего ребёнка — это займёт не больше часа.
+                <h1 className="text-5xl md:text-6xl font-bold text-[#1a2033] leading-tight mb-6">
+                  Превратите любой текст<br />
+                  <span className="bg-gradient-to-r from-[#3b82f6] to-[#6366f1] bg-clip-text text-transparent">в аудиокнигу</span>
+                </h1>
+                <p className="text-[#64748b] text-xl mb-10 max-w-xl mx-auto">
+                  Загрузите файл или вставьте текст — через минуту получите готовый MP3 с голосом профессионального диктора.
                 </p>
-                <div className="space-y-3">
-                  {[
-                    { icon: "FileText", text: "Загрузите текст или введите вручную" },
-                    { icon: "Mic", text: "Запишите голос или выберите ИИ-диктора" },
-                    { icon: "Music", text: "Добавьте фоновую музыку и звуки" },
-                    { icon: "Share2", text: "Опубликуйте в библиотеке или скачайте" },
-                  ].map((step, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white/3 border border-white/8 rounded-xl px-4 py-3 hover:border-[#c8913a]/30 transition-colors">
-                      <div className="w-8 h-8 rounded-lg bg-[#c8913a]/20 flex items-center justify-center text-[#c8913a] flex-shrink-0">
-                        <Icon name={step.icon} fallback="Star" size={16} />
-                      </div>
-                      <span className="text-sm text-[#d4c4a8]">{step.text}</span>
-                    </div>
-                  ))}
-                </div>
-                <button className="mt-8 flex items-center gap-2 bg-[#c8913a] hover:bg-[#e0a846] text-[#0d0a06] font-bold px-8 py-4 rounded-full transition-all duration-200 hover:scale-105 hover:shadow-[0_0_30px_rgba(200,145,58,0.4)]">
-                  <Icon name="Mic" size={18} />
-                  Начать запись
-                </button>
-              </div>
-              <div className="relative animate-fade-in stagger-3">
-                <div className="rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-amber-900/20">
-                  <img
-                    src="https://cdn.poehali.dev/projects/84e163f9-9661-409a-9ae9-a67ebf795811/files/91881a82-f1ec-47c3-a4e6-9b872669e27c.jpg"
-                    alt="Студия записи"
-                    className="w-full h-72 object-cover"
-                  />
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => { setText(""); setTitle("Моя аудиокнига"); setScreen("editor"); }}
+                    className="flex items-center justify-center gap-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold px-8 py-4 rounded-xl text-lg transition-all hover:shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5"
+                  >
+                    <Icon name="Mic" size={20} />
+                    Создать аудиокнигу
+                  </button>
+                  <button
+                    onClick={loadCabinet}
+                    className="flex items-center justify-center gap-2 bg-white text-[#64748b] hover:text-[#3b82f6] border border-[#e2e8f0] font-semibold px-8 py-4 rounded-xl text-lg transition-all hover:border-blue-300 hover:shadow-sm"
+                  >
+                    <Icon name="FolderOpen" size={20} />
+                    Мои проекты
+                  </button>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Popular creators */}
-            <div>
-              <h3 className="text-xl font-bold text-[#f0e8d8] mb-6">Популярные авторы самиздата</h3>
+            {/* Use cases */}
+            <section className="px-6 py-20 max-w-5xl mx-auto">
+              <h2 className="text-3xl font-bold text-center text-[#1a2033] mb-12">Для кого это приложение?</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { name: "Анна Петрова", books: 12, emoji: "👩‍🎤" },
-                  { name: "Иван Смирнов", books: 8, emoji: "👨‍🎨" },
-                  { name: "Мария Козлова", books: 21, emoji: "👩‍💼" },
-                  { name: "Алексей Новиков", books: 5, emoji: "🧑‍🎭" },
-                ].map((author) => (
-                  <div key={author.name} className="bg-white/3 border border-white/8 rounded-2xl p-4 text-center hover:border-[#c8913a]/30 transition-all duration-200 cursor-pointer group">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-700/40 to-orange-800/40 border border-[#c8913a]/20 flex items-center justify-center text-2xl mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      {author.emoji}
+                {USE_CASES.map((u, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-6 border border-[#e5e9f0] hover:border-blue-200 hover:shadow-md transition-all text-center animate-fade-in" style={{ animationDelay: `${i * 0.08}s` }}>
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center mx-auto mb-4">
+                      <Icon name={u.icon as Parameters<typeof Icon>[0]["name"]} fallback="Star" size={22} className="text-[#3b82f6]" />
                     </div>
-                    <div className="font-medium text-sm text-[#f0e8d8] mb-1">{author.name}</div>
-                    <div className="text-xs text-[#a89878]">{author.books} книг</div>
+                    <h3 className="font-semibold text-[#1a2033] mb-2">{u.title}</h3>
+                    <p className="text-sm text-[#64748b]">{u.desc}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </section>
-      )}
+            </section>
 
-      {/* CTA banner */}
-      <section className="px-6 pb-20">
-        <div className="max-w-5xl mx-auto">
-          <div className="relative rounded-3xl overflow-hidden border border-[#c8913a]/20 p-8 md:p-12 text-center"
-            style={{ background: "linear-gradient(135deg, rgba(200,145,58,0.12) 0%, rgba(13,10,6,0.8) 50%, rgba(200,100,30,0.08) 100%)" }}>
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-40 bg-[#c8913a]/10 rounded-full blur-[60px]" />
-            </div>
-            <div className="relative">
-              <div className="text-4xl mb-4">🌙</div>
-              <h2 className="text-3xl font-bold text-[#f0e8d8] mb-3">Сказка на ночь — каждый вечер</h2>
-              <p className="text-[#a89878] mb-8 max-w-md mx-auto">
-                Подпишитесь и получите доступ ко всем аудиокнигам. Первые 7 дней бесплатно.
-              </p>
-              <button className="bg-[#c8913a] hover:bg-[#e0a846] text-[#0d0a06] font-bold px-10 py-4 rounded-full text-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_40px_rgba(200,145,58,0.5)]">
-                Попробовать бесплатно
+            {/* How it works */}
+            <section className="bg-white px-6 py-20">
+              <div className="max-w-4xl mx-auto">
+                <h2 className="text-3xl font-bold text-center text-[#1a2033] mb-12">Как это работает</h2>
+                <div className="grid md:grid-cols-3 gap-8">
+                  {[
+                    { step: "1", icon: "Upload", title: "Загрузите текст", desc: "Вставьте текст вручную или загрузите файл .txt" },
+                    { step: "2", icon: "SlidersHorizontal", title: "Настройте голос", desc: "Выберите диктора, скорость и интонацию" },
+                    { step: "3", icon: "Download", title: "Скачайте MP3", desc: "Получите готовый аудиофайл за 30–60 секунд" },
+                  ].map((s) => (
+                    <div key={s.step} className="text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+                        <Icon name={s.icon as Parameters<typeof Icon>[0]["name"]} fallback="Star" size={24} className="text-white" />
+                      </div>
+                      <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Шаг {s.step}</div>
+                      <h3 className="font-bold text-lg text-[#1a2033] mb-2">{s.title}</h3>
+                      <p className="text-[#64748b] text-sm">{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Voices preview */}
+            <section className="px-6 py-20 max-w-5xl mx-auto">
+              <h2 className="text-3xl font-bold text-center text-[#1a2033] mb-4">6 профессиональных голосов</h2>
+              <p className="text-center text-[#64748b] mb-12">Нейросетевые дикторы Yandex SpeechKit</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {VOICES.map((v) => (
+                  <div key={v.id} className="bg-white rounded-2xl p-5 border border-[#e5e9f0] flex items-center gap-4 hover:border-blue-200 hover:shadow-sm transition-all">
+                    <div className="text-3xl">{v.emoji}</div>
+                    <div>
+                      <div className="font-semibold text-[#1a2033]">{v.name}</div>
+                      <div className="text-xs text-[#64748b]">{v.gender} · {v.style}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* EDITOR */}
+        {screen === "editor" && (
+          <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="flex items-center gap-3 mb-8">
+              <button onClick={() => setScreen("home")} className="text-[#64748b] hover:text-[#3b82f6] transition-colors">
+                <Icon name="ArrowLeft" size={20} />
               </button>
+              <h1 className="text-2xl font-bold text-[#1a2033]">Новая аудиокнига</h1>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Left: text */}
+              <div className="md:col-span-2 space-y-4">
+                <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0]">
+                  <label className="block text-sm font-semibold text-[#1a2033] mb-3">Название</label>
+                  <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="w-full border border-[#e5e9f0] rounded-xl px-4 py-3 text-[#1a2033] focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="Название аудиокниги"
+                  />
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0]">
+                  <label className="block text-sm font-semibold text-[#1a2033] mb-3">Текст для озвучки</label>
+
+                  {/* Drop zone */}
+                  {!text && (
+                    <div
+                      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={onDrop}
+                      onClick={() => fileRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all mb-4 ${
+                        dragging ? "border-blue-400 bg-blue-50" : "border-[#e2e8f0] hover:border-blue-300 hover:bg-blue-50/50"
+                      }`}
+                    >
+                      <Icon name="Upload" size={32} className="text-[#94a3b8] mx-auto mb-3" />
+                      <p className="font-semibold text-[#475569]">Перетащите файл или нажмите для выбора</p>
+                      <p className="text-sm text-[#94a3b8] mt-1">.txt файлы</p>
+                      <input ref={fileRef} type="file" accept=".txt" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                    </div>
+                  )}
+
+                  <textarea
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    rows={text ? 14 : 5}
+                    className="w-full border border-[#e5e9f0] rounded-xl px-4 py-3 text-[#1a2033] text-sm leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none transition-all"
+                    placeholder="Или вставьте текст сюда..."
+                  />
+                  <div className="flex justify-between items-center mt-2 text-xs text-[#94a3b8]">
+                    <span>{text.length} символов</span>
+                    {text.length > 5000 && <span className="text-amber-500">⚠ Будут озвучены первые 5 000 символов</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: settings */}
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0]">
+                  <h3 className="font-semibold text-[#1a2033] mb-4 flex items-center gap-2">
+                    <Icon name="User" size={16} className="text-[#3b82f6]" />
+                    Голос диктора
+                  </h3>
+                  <div className="space-y-2">
+                    {VOICES.map(v => (
+                      <button
+                        key={v.id}
+                        onClick={() => setVoice(v.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
+                          voice === v.id
+                            ? "bg-blue-50 border border-blue-200 text-[#3b82f6]"
+                            : "border border-transparent hover:bg-[#f8fafc] text-[#475569]"
+                        }`}
+                      >
+                        <span className="text-xl">{v.emoji}</span>
+                        <div>
+                          <div className="font-medium text-sm text-[#1a2033]">{v.name}</div>
+                          <div className="text-xs text-[#94a3b8]">{v.style}</div>
+                        </div>
+                        {voice === v.id && <Icon name="Check" size={14} className="ml-auto text-[#3b82f6]" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0]">
+                  <h3 className="font-semibold text-[#1a2033] mb-4 flex items-center gap-2">
+                    <Icon name="Gauge" size={16} className="text-[#3b82f6]" />
+                    Скорость речи: <span className="text-[#3b82f6]">{speed.toFixed(1)}x</span>
+                  </h3>
+                  <input
+                    type="range" min={0.8} max={2.0} step={0.1}
+                    value={speed}
+                    onChange={e => setSpeed(parseFloat(e.target.value))}
+                    className="w-full accent-blue-500"
+                  />
+                  <div className="flex justify-between text-xs text-[#94a3b8] mt-1">
+                    <span>Медленно 0.8x</span>
+                    <span>Быстро 2.0x</span>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+                    <Icon name="AlertCircle" size={16} className="flex-shrink-0 mt-0.5" />
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={generate}
+                  disabled={!text.trim()}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#3b82f6] to-[#6366f1] hover:from-[#2563eb] hover:to-[#4f46e5] disabled:from-[#94a3b8] disabled:to-[#94a3b8] text-white font-bold py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-200 disabled:cursor-not-allowed"
+                >
+                  <Icon name="Wand2" size={18} />
+                  Создать аудиокнигу
+                </button>
+                <p className="text-center text-xs text-[#94a3b8]">~30–60 секунд для короткого текста</p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        )}
+
+        {/* GENERATING */}
+        {screen === "generating" && (
+          <div className="min-h-[80vh] flex items-center justify-center px-6">
+            <div className="max-w-md w-full text-center animate-fade-in">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-200">
+                <Icon name="AudioWaveform" fallback="Mic" size={40} className="text-white animate-pulse" />
+              </div>
+              <h2 className="text-2xl font-bold text-[#1a2033] mb-2">Создаю аудиокнигу...</h2>
+              <p className="text-[#64748b] mb-8">Нейросеть озвучивает текст голосом {VOICES.find(v => v.id === voice)?.name}</p>
+
+              <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0] shadow-sm">
+                <div className="flex justify-between text-sm text-[#64748b] mb-3">
+                  <span>Прогресс</span>
+                  <span className="font-semibold text-[#3b82f6]">{Math.round(progress)}%</span>
+                </div>
+                <div className="h-3 bg-[#f1f5f9] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#3b82f6] to-[#6366f1] rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="flex justify-center gap-1 mt-6">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="w-1.5 rounded-full bg-[#3b82f6] wave-bar"
+                      style={{ height: "24px", animationDelay: `${i * 0.12}s` }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RESULT */}
+        {screen === "result" && (
+          <div className="min-h-[80vh] flex items-center justify-center px-6 py-12">
+            <div className="max-w-lg w-full animate-fade-in">
+              <div className="text-center mb-8">
+                <div className="text-5xl mb-4">🎉</div>
+                <h2 className="text-3xl font-bold text-[#1a2033] mb-2">Аудиокнига готова!</h2>
+                <p className="text-[#64748b]">«{title}»</p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 border border-[#e5e9f0] shadow-sm mb-6">
+                {resultUrl && <audio ref={audioRef} src={resultUrl} onEnded={() => setPlaying(false)} />}
+
+                <div className="flex items-center gap-4 mb-4">
+                  <button
+                    onClick={togglePlay}
+                    className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center text-white shadow-lg shadow-blue-200 hover:scale-105 transition-transform flex-shrink-0"
+                  >
+                    <Icon name={playing ? "Pause" : "Play"} size={24} />
+                  </button>
+                  <div className="flex-1">
+                    <div className="font-semibold text-[#1a2033]">{title}</div>
+                    <div className="text-sm text-[#94a3b8] flex items-center gap-2">
+                      <span>{VOICES.find(v => v.id === voice)?.name}</span>
+                      <span>·</span>
+                      <span>{speed}x</span>
+                    </div>
+                  </div>
+                </div>
+
+                {playing && (
+                  <div className="flex justify-center gap-1 py-2">
+                    {[...Array(8)].map((_, i) => (
+                      <div key={i} className="w-1 rounded-full bg-[#3b82f6] wave-bar"
+                        style={{ height: "20px", animationDelay: `${i * 0.1}s` }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <a
+                  href={resultUrl}
+                  download={`${title}.mp3`}
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-[#3b82f6] to-[#6366f1] text-white font-bold py-4 rounded-xl hover:from-[#2563eb] hover:to-[#4f46e5] transition-all hover:shadow-lg hover:shadow-blue-200"
+                >
+                  <Icon name="Download" size={18} />
+                  Скачать MP3
+                </a>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => { setText(""); setTitle("Моя аудиокнига"); setScreen("editor"); }}
+                    className="flex items-center justify-center gap-2 border border-[#e2e8f0] text-[#475569] hover:border-blue-300 hover:text-[#3b82f6] font-semibold py-3 rounded-xl transition-all hover:bg-blue-50"
+                  >
+                    <Icon name="Plus" size={16} />
+                    Новая книга
+                  </button>
+                  <button
+                    onClick={loadCabinet}
+                    className="flex items-center justify-center gap-2 border border-[#e2e8f0] text-[#475569] hover:border-blue-300 hover:text-[#3b82f6] font-semibold py-3 rounded-xl transition-all hover:bg-blue-50"
+                  >
+                    <Icon name="FolderOpen" size={16} />
+                    Мои книги
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CABINET */}
+        {screen === "cabinet" && (
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="flex items-center gap-3 mb-8">
+              <button onClick={() => setScreen("home")} className="text-[#64748b] hover:text-[#3b82f6] transition-colors">
+                <Icon name="ArrowLeft" size={20} />
+              </button>
+              <h1 className="text-2xl font-bold text-[#1a2033]">Мои аудиокниги</h1>
+            </div>
+
+            {loadingCabinet ? (
+              <div className="text-center py-20 text-[#94a3b8]">
+                <Icon name="Loader2" size={32} className="mx-auto mb-4 animate-spin" />
+                Загружаю проекты...
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl border border-[#e5e9f0]">
+                <div className="text-5xl mb-4">📚</div>
+                <h3 className="text-xl font-semibold text-[#1a2033] mb-2">Пока нет аудиокниг</h3>
+                <p className="text-[#64748b] mb-6">Создайте первую — это займёт меньше минуты</p>
+                <button
+                  onClick={() => { setText(""); setTitle("Моя аудиокнига"); setScreen("editor"); }}
+                  className="inline-flex items-center gap-2 bg-[#3b82f6] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#2563eb] transition-all"
+                >
+                  <Icon name="Plus" size={16} />
+                  Создать первую книгу
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {projects.map((p) => (
+                  <div key={p.id} className="bg-white rounded-2xl p-5 border border-[#e5e9f0] flex items-center gap-4 hover:border-blue-200 hover:shadow-sm transition-all">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center flex-shrink-0">
+                      <Icon name="BookOpen" size={20} className="text-[#3b82f6]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[#1a2033] truncate">{p.title}</div>
+                      <div className="text-xs text-[#94a3b8] mt-0.5">
+                        {new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {p.audio_url && (
+                        <a
+                          href={p.audio_url}
+                          download={`${p.title}.mp3`}
+                          className="flex items-center gap-1 text-sm text-[#3b82f6] hover:text-[#2563eb] border border-blue-200 hover:border-blue-400 px-3 py-2 rounded-lg transition-all"
+                        >
+                          <Icon name="Download" size={14} />
+                          MP3
+                        </a>
+                      )}
+                      <button
+                        onClick={() => deleteProject(p.id)}
+                        className="p-2 text-[#94a3b8] hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      >
+                        <Icon name="Trash2" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/8 px-6 py-8">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-[#e5e9f0] bg-white px-6 py-8 mt-20">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#94a3b8]">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📖</span>
-            <span className="font-bold text-[#f0e8d8]">СказкоФон</span>
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center">
+              <Icon name="BookOpen" size={12} className="text-white" />
+            </div>
+            <span className="font-semibold text-[#475569]">АудиоКнига Мастер</span>
           </div>
-          <div className="text-sm text-[#a89878]">Для тех, кто любит слушать и творить</div>
-          <div className="flex gap-4 text-sm text-[#a89878]">
-            <button className="hover:text-[#c8913a] transition-colors">О нас</button>
-            <button className="hover:text-[#c8913a] transition-colors">Контакты</button>
-            <button className="hover:text-[#c8913a] transition-colors">Помощь</button>
-          </div>
+          <span>Синтез речи: Yandex SpeechKit</span>
+          <span>© 2024 Все права защищены</span>
         </div>
       </footer>
-
-      {/* Mobile tab nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0d0a06]/95 backdrop-blur-xl border-t border-white/10 flex">
-        {["library", "studio"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as "library" | "studio")}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
-              activeTab === tab ? "text-[#c8913a]" : "text-[#a89878]"
-            }`}
-          >
-            <Icon name={tab === "library" ? "BookOpen" : "Mic"} size={20} />
-            {tab === "library" ? "Библиотека" : "Студия"}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
