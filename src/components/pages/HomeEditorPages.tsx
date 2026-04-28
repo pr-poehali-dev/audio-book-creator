@@ -154,11 +154,18 @@ export function EditorPage() {
             className="bg-transparent resize-none font-ibm text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[120px] leading-relaxed w-full"
             placeholder="Введите текст..." />
           <div className="flex gap-2 flex-wrap">
-            {["Пауза 1с", "Ударение", "Радость", "Грусть", "Нейтрально"].map(tag => (
-              <button key={tag}
+            {[
+              { label: "Пауза 1с",    insert: "<break time=\"1s\"/>" },
+              { label: "Ударение",    insert: "<emphasis>" },
+              { label: "Радость",     insert: "<prosody pitch=\"+2st\">" },
+              { label: "Грусть",      insert: "<prosody pitch=\"-2st\">" },
+              { label: "Нейтрально",  insert: "<prosody rate=\"medium\">" },
+            ].map(tag => (
+              <button key={tag.label}
+                onClick={() => setText(t => t + tag.insert)}
                 className="text-[11px] font-ibm px-3 py-1 rounded-full hover:bg-purple-500/10 hover:text-purple-400 transition-colors text-muted-foreground"
                 style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
-                + {tag}
+                + {tag.label}
               </button>
             ))}
           </div>
@@ -250,7 +257,14 @@ export function EditorPage() {
             </div>
           </div>
           {generated && (
-            <button className="px-4 py-2 rounded-lg text-sm font-ibm flex items-center gap-2 transition-all hover:bg-white/5"
+            <button
+              onClick={() => {
+                const a = document.createElement("a");
+                a.href = "#";
+                a.download = `voiceforge_output.${format.toLowerCase()}`;
+                a.click();
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-ibm flex items-center gap-2 transition-all hover:bg-white/5"
               style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
               <Icon name="Download" size={14} className="text-cyan-400" />
               {format}

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Page, NAV } from "@/components/app-data";
 
@@ -10,12 +10,23 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
+const NOTIFICATIONS = [
+  { id: "1", text: "Синтез «Реклама кофейни» завершён", time: "2 мин назад", read: false },
+  { id: "2", text: "Yandex SpeechKit требует ключ API",  time: "1 час назад",  read: false },
+  { id: "3", text: "Аудиокнига гл. 3 готова к скачиванию", time: "вчера",    read: true },
+];
+
 export function AppLayout({ page, setPage, sidebarOpen, setSidebarOpen, children }: AppLayoutProps) {
   const mainRef = useRef<HTMLDivElement>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const unread = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [page]);
+
+  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#080c14" }}>
@@ -94,11 +105,42 @@ export function AppLayout({ page, setPage, sidebarOpen, setSidebarOpen, children
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               <span className="text-[11px] font-ibm text-muted-foreground hidden sm:block">Все API онлайн</span>
             </div>
-            <button className="p-2 rounded-lg hover:bg-white/5 transition-colors relative"
-              style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
-              <Icon name="Bell" size={17} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-purple-400" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(o => !o)}
+                className="p-2 rounded-lg hover:bg-white/5 transition-colors relative"
+                style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
+                <Icon name="Bell" size={17} />
+                {unread > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-[9px] font-bold text-white">{unread}</span>
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 rounded-xl z-50 shadow-2xl overflow-hidden"
+                  style={{ background: "rgba(12,15,28,0.98)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+                    <span className="font-syne font-semibold text-sm">Уведомления</span>
+                    {unread > 0 && (
+                      <button onClick={markAllRead} className="text-[11px] font-ibm text-purple-400 hover:text-purple-300 transition-colors">
+                        Прочитать все
+                      </button>
+                    )}
+                  </div>
+                  {notifications.map(n => (
+                    <div key={n.id}
+                      onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}
+                      className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                      style={{ background: n.read ? "transparent" : "rgba(124,58,237,0.06)" }}>
+                      <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${n.read ? "bg-transparent" : "bg-purple-400"}`} />
+                      <div>
+                        <div className="text-xs font-ibm text-foreground/90">{n.text}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{n.time}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center font-syne font-bold text-sm text-white"
               style={{ background: "linear-gradient(135deg,#7c3aed,#22d3ee)" }}>
               A

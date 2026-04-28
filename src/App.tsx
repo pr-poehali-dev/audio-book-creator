@@ -20,7 +20,7 @@ export default function App() {
     home:     <HomePage setPage={setPage} />,
     editor:   <EditorPage />,
     projects: <ProjectsPage />,
-    library:  <LibraryPage />,
+    library:  <LibraryPage setPage={setPage} />,
     export:   <ExportPage />,
     settings: <SettingsPage />,
     profile:  <ProfilePage />,
