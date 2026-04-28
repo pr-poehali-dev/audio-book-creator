@@ -116,6 +116,21 @@
 
 @layer base {
   :root {
+    /* Fallback — светлая тема по умолчанию для :root без класса */
+    --ab-page-bg: #f4f6f9;
+    --ab-text-primary: #1a2033;
+    --ab-text-secondary: #64748b;
+    --ab-text-muted: #94a3b8;
+    --ab-border: #e5e9f0;
+    --ab-card: #ffffff;
+    --ab-accent: #3b82f6;
+    --ab-accent-hover: #2563eb;
+    --ab-accent-text: #475569;
+    --ab-hero-from: #eef2ff;
+    --ab-hero-via: #f4f6f9;
+    --ab-hero-to: #eff6ff;
+    --ab-range-track: hsl(214 32% 88%);
+
     --background: 222 20% 8%;
     --foreground: 210 20% 92%;
 
@@ -175,13 +190,24 @@
   }
 
   html {
+    color-scheme: light dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  html.dark {
     color-scheme: dark;
   }
 
   body {
-    @apply bg-background text-foreground;
     font-family: "IBM Plex Sans", sans-serif;
-    background: #080c14;
+    background: var(--ab-page-bg, #f4f6f9);
+    color: var(--ab-text-primary, #1a2033);
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   h1,
