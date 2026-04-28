@@ -20,6 +20,7 @@ export default {
       fontFamily: {
         syne: ['Syne', 'sans-serif'],
         ibm: ['"IBM Plex Sans"', 'sans-serif'],
+        golos: ['"Golos Text"', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
