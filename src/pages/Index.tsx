@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import {
   TTS_URL, PARSE_URL, SUPPORTED_EXTS,
@@ -8,7 +8,29 @@ import { HomeScreen }      from "@/components/audiobook/HomeScreen";
 import { EditorScreen, GeneratingScreen, ResultScreen } from "@/components/audiobook/EditorScreens";
 import { CabinetScreen }   from "@/components/audiobook/CabinetScreen";
 
+type Theme = "light" | "dark";
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem("theme") as Theme | null;
+    if (saved) return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggle = () => setTheme(t => t === "light" ? "dark" : "light");
+  return { theme, toggle };
+}
+
 export default function App() {
+  const { theme, toggle: toggleTheme } = useTheme();
+
   const [screen, setScreen]               = useState<Screen>("home");
   const [text, setText]                   = useState("");
   const [title, setTitle]                 = useState("Моя аудиокнига");
@@ -43,7 +65,6 @@ export default function App() {
       return;
     }
 
-    // PDF / EPUB / DOCX — отправляем на бэкенд
     setParsing(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -129,29 +150,58 @@ export default function App() {
   const goNewBook = () => { setText(""); setTitle("Моя аудиокнига"); setScreen("editor"); };
 
   return (
-    <div className="min-h-screen bg-[#f4f6f9] text-[#1a2033] font-ibm">
-
+    <div
+      className="min-h-screen font-ibm transition-colors duration-300"
+      style={{ background: "var(--ab-page-bg)", color: "var(--ab-text-primary)" }}
+    >
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#e5e9f0] px-6 py-3 flex items-center justify-between shadow-sm">
-        <button onClick={() => setScreen("home")} className="flex items-center gap-2">
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md px-6 py-3 flex items-center justify-between shadow-sm transition-colors duration-300"
+        style={{ background: "var(--ab-card)", borderBottom: "1px solid var(--ab-border)" }}
+        role="navigation"
+        aria-label="Основная навигация"
+      >
+        <button
+          onClick={() => setScreen("home")}
+          className="flex items-center gap-2"
+          aria-label="На главную — АудиоКнига Мастер"
+        >
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center">
             <Icon name="BookAudio" fallback="BookOpen" size={16} className="text-white" />
           </div>
-          <span className="font-bold text-[#1a2033]">АудиоКнига Мастер</span>
+          <span className="font-bold" style={{ color: "var(--ab-text-primary)" }}>АудиоКнига Мастер</span>
         </button>
+
         <div className="flex items-center gap-2">
           <button
             onClick={loadCabinet}
-            className="flex items-center gap-2 text-sm text-[#64748b] hover:text-[#3b82f6] px-3 py-2 rounded-lg hover:bg-blue-50 transition-all"
+            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg transition-all hover:bg-blue-50 dark:hover:bg-blue-950/30"
+            style={{ color: "var(--ab-text-secondary)" }}
+            aria-label="Открыть мои книги"
           >
-            <Icon name="FolderOpen" size={16} />
+            <Icon name="FolderOpen" size={16} aria-hidden="true" />
             <span className="hidden sm:inline">Мои книги</span>
           </button>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg transition-all hover:bg-blue-50 dark:hover:bg-blue-950/30"
+            style={{ color: "var(--ab-text-secondary)" }}
+            aria-label={theme === "light" ? "Переключить на тёмную тему" : "Переключить на светлую тему"}
+          >
+            <Icon name={theme === "light" ? "Moon" : "Sun"} size={17} aria-hidden="true" />
+          </button>
+
           <button
             onClick={goNewBook}
-            className="flex items-center gap-2 text-sm bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold px-4 py-2 rounded-lg transition-all hover:shadow-md"
+            className="flex items-center gap-2 text-sm text-white font-semibold px-4 py-2 rounded-lg transition-all hover:shadow-md"
+            style={{ background: "var(--ab-accent)" }}
+            aria-label="Создать новую аудиокнигу"
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--ab-accent-hover)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--ab-accent)")}
           >
-            <Icon name="Plus" size={16} />
+            <Icon name="Plus" size={16} aria-hidden="true" />
             Создать
           </button>
         </div>
@@ -209,13 +259,17 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-[#e5e9f0] bg-white px-6 py-8 mt-20">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#94a3b8]">
+      <footer
+        className="px-6 py-8 mt-20 transition-colors duration-300"
+        style={{ borderTop: "1px solid var(--ab-border)", background: "var(--ab-card)" }}
+        role="contentinfo"
+      >
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm" style={{ color: "var(--ab-text-muted)" }}>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center" aria-hidden="true">
               <Icon name="BookOpen" size={12} className="text-white" />
             </div>
-            <span className="font-semibold text-[#475569]">АудиоКнига Мастер</span>
+            <span className="font-semibold" style={{ color: "var(--ab-text-secondary)" }}>АудиоКнига Мастер</span>
           </div>
           <span>Синтез речи: Yandex SpeechKit</span>
           <span>© 2024 Все права защищены</span>

@@ -13,43 +13,64 @@ export function CabinetScreen({
   projects, loadingCabinet, setScreen, onDeleteProject, onNewBook,
 }: CabinetScreenProps) {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <main className="max-w-4xl mx-auto px-4 py-8" aria-label="Мои аудиокниги">
       <div className="flex items-center gap-3 mb-8">
-        <button onClick={() => setScreen("home")} className="text-[#64748b] hover:text-[#3b82f6] transition-colors">
-          <Icon name="ArrowLeft" size={20} />
+        <button
+          onClick={() => setScreen("home")}
+          className="transition-colors"
+          style={{ color: "var(--ab-text-secondary)" }}
+          aria-label="Вернуться на главную"
+        >
+          <Icon name="ArrowLeft" size={20} aria-hidden="true" />
         </button>
-        <h1 className="text-2xl font-bold text-[#1a2033]">Мои аудиокниги</h1>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--ab-text-primary)" }}>Мои аудиокниги</h1>
       </div>
 
       {loadingCabinet ? (
-        <div className="text-center py-20 text-[#94a3b8]">
-          <Icon name="Loader2" size={32} className="mx-auto mb-4 animate-spin" />
+        <div className="text-center py-20" style={{ color: "var(--ab-text-muted)" }} role="status" aria-live="polite" aria-label="Загружаю проекты">
+          <Icon name="Loader2" size={32} className="mx-auto mb-4 animate-spin" aria-hidden="true" />
           Загружаю проекты...
         </div>
       ) : projects.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-[#e5e9f0]">
-          <div className="text-5xl mb-4">📚</div>
-          <h3 className="text-xl font-semibold text-[#1a2033] mb-2">Пока нет аудиокниг</h3>
-          <p className="text-[#64748b] mb-6">Создайте первую — это займёт меньше минуты</p>
+        <div
+          className="text-center py-20 rounded-2xl"
+          style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}
+          role="status"
+        >
+          <div className="text-5xl mb-4" aria-hidden="true">📚</div>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--ab-text-primary)" }}>Пока нет аудиокниг</h2>
+          <p className="mb-6" style={{ color: "var(--ab-text-secondary)" }}>Создайте первую — это займёт меньше минуты</p>
           <button
             onClick={onNewBook}
-            className="inline-flex items-center gap-2 bg-[#3b82f6] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#2563eb] transition-all"
+            className="inline-flex items-center gap-2 text-white font-bold px-6 py-3 rounded-xl transition-all hover:shadow-md"
+            style={{ background: "var(--ab-accent)" }}
+            aria-label="Создать первую аудиокнигу"
           >
-            <Icon name="Plus" size={16} />
+            <Icon name="Plus" size={16} aria-hidden="true" />
             Создать первую книгу
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-3" aria-label={`Список аудиокниг, всего ${projects.length}`}>
           {projects.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl p-5 border border-[#e5e9f0] flex items-center gap-4 hover:border-blue-200 hover:shadow-sm transition-all">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center flex-shrink-0">
+            <li
+              key={p.id}
+              className="rounded-2xl p-5 flex items-center gap-4 transition-all"
+              style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(59,130,246,0.08)" }}
+                aria-hidden="true"
+              >
                 <Icon name="BookOpen" size={20} className="text-[#3b82f6]" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#1a2033] truncate">{p.title}</div>
-                <div className="text-xs text-[#94a3b8] mt-0.5">
-                  {new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                <div className="font-semibold truncate" style={{ color: "var(--ab-text-primary)" }}>{p.title}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--ab-text-muted)" }}>
+                  <time dateTime={p.created_at}>
+                    {new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                  </time>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -57,23 +78,27 @@ export function CabinetScreen({
                   <a
                     href={p.audio_url}
                     download={`${p.title}.mp3`}
-                    className="flex items-center gap-1 text-sm text-[#3b82f6] hover:text-[#2563eb] border border-blue-200 hover:border-blue-400 px-3 py-2 rounded-lg transition-all"
+                    className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg transition-all"
+                    style={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)" }}
+                    aria-label={`Скачать "${p.title}" в формате MP3`}
                   >
-                    <Icon name="Download" size={14} />
+                    <Icon name="Download" size={14} aria-hidden="true" />
                     MP3
                   </a>
                 )}
                 <button
                   onClick={() => onDeleteProject(p.id)}
-                  className="p-2 text-[#94a3b8] hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  className="p-2 rounded-lg transition-all hover:bg-red-50"
+                  style={{ color: "var(--ab-text-muted)" }}
+                  aria-label={`Удалить аудиокнигу "${p.title}"`}
                 >
-                  <Icon name="Trash2" size={14} />
+                  <Icon name="Trash2" size={14} aria-hidden="true" />
                 </button>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </main>
   );
 }

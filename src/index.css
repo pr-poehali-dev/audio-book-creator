@@ -3,6 +3,118 @@
 @tailwind utilities;
 
 @layer base {
+  /* ─── Light theme (AudioBook Master app) ──────────────────── */
+  :root.light {
+    --background: 210 20% 97%;
+    --foreground: 222 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 30% 12%;
+
+    --primary: 221 83% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 93%;
+    --secondary-foreground: 222 30% 12%;
+
+    --muted: 210 20% 93%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 221 83% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 221 83% 60%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 30% 12%;
+    --sidebar-primary: 221 83% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 93%;
+    --sidebar-accent-foreground: 222 30% 12%;
+    --sidebar-border: 214 32% 88%;
+    --sidebar-ring: 221 83% 60%;
+
+    /* Custom audiobook vars — light */
+    --ab-page-bg: #f4f6f9;
+    --ab-text-primary: #1a2033;
+    --ab-text-secondary: #64748b;
+    --ab-text-muted: #94a3b8;
+    --ab-border: #e5e9f0;
+    --ab-card: #ffffff;
+    --ab-accent: #3b82f6;
+    --ab-accent-hover: #2563eb;
+    --ab-accent-text: #475569;
+    --ab-hero-from: #eef2ff;
+    --ab-hero-via: #f4f6f9;
+    --ab-hero-to: #eff6ff;
+    --ab-range-track: hsl(214 32% 88%);
+  }
+
+  /* ─── Dark theme (AudioBook Master app) ───────────────────── */
+  :root.dark {
+    --background: 222 20% 8%;
+    --foreground: 210 20% 92%;
+
+    --card: 222 18% 11%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 222 18% 11%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 221 83% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 15% 16%;
+    --secondary-foreground: 210 20% 92%;
+
+    --muted: 222 15% 16%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 221 83% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 15% 18%;
+    --input: 222 15% 16%;
+    --ring: 221 83% 60%;
+
+    --sidebar-background: 222 22% 6%;
+    --sidebar-foreground: 210 15% 75%;
+    --sidebar-primary: 221 83% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 15% 14%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 222 15% 14%;
+    --sidebar-ring: 221 83% 60%;
+
+    /* Custom audiobook vars — dark */
+    --ab-page-bg: #0d1117;
+    --ab-text-primary: #e2e8f0;
+    --ab-text-secondary: #94a3b8;
+    --ab-text-muted: #64748b;
+    --ab-border: #1e293b;
+    --ab-card: #111827;
+    --ab-accent: #3b82f6;
+    --ab-accent-hover: #60a5fa;
+    --ab-accent-text: #94a3b8;
+    --ab-hero-from: #0f172a;
+    --ab-hero-via: #0d1117;
+    --ab-hero-to: #0f172a;
+    --ab-range-track: hsl(222 15% 20%);
+  }
+}
+
+@layer base {
   :root {
     --background: 222 20% 8%;
     --foreground: 210 20% 92%;
@@ -271,7 +383,7 @@ input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
-  background: hsl(222 15% 20%);
+  background: var(--ab-range-track, hsl(222 15% 20%));
   border-radius: 2px;
   outline: none;
 }
