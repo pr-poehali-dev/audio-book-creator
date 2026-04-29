@@ -2,6 +2,7 @@ import Icon from "@/components/ui/icon";
 import { Screen, VOICES, USE_CASES } from "@/components/audiobook/audiobook-data";
 import { ClassicsSection } from "@/components/audiobook/ClassicsSection";
 import { LiveSearch } from "@/components/audiobook/LiveSearch";
+import { WikisourceSearch } from "@/components/audiobook/WikisourceSearch";
 
 interface HomeScreenProps {
   setScreen: (s: Screen) => void;
@@ -112,7 +113,10 @@ export function HomeScreen({ setScreen, onLoadCabinet, onSelectBook }: HomeScree
       {/* Classics catalogue */}
       <ClassicsSection onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
 
-      {/* Live search */}
+      {/* Wikisource — full texts */}
+      <WikisourceSearch onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
+
+      {/* Open Library live search */}
       <LiveSearch onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
 
       {/* Voices preview */}
