@@ -1,12 +1,15 @@
 import Icon from "@/components/ui/icon";
 import { Screen, VOICES, USE_CASES } from "@/components/audiobook/audiobook-data";
+import { ClassicsSection } from "@/components/audiobook/ClassicsSection";
+import { LiveSearch } from "@/components/audiobook/LiveSearch";
 
 interface HomeScreenProps {
   setScreen: (s: Screen) => void;
   onLoadCabinet: () => void;
+  onSelectBook: (text: string, title: string) => void;
 }
 
-export function HomeScreen({ setScreen, onLoadCabinet }: HomeScreenProps) {
+export function HomeScreen({ setScreen, onLoadCabinet, onSelectBook }: HomeScreenProps) {
   return (
     <div>
       {/* Hero */}
@@ -105,6 +108,12 @@ export function HomeScreen({ setScreen, onLoadCabinet }: HomeScreenProps) {
           </div>
         </div>
       </section>
+
+      {/* Classics catalogue */}
+      <ClassicsSection onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
+
+      {/* Live search */}
+      <LiveSearch onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
 
       {/* Voices preview */}
       <section className="px-6 py-20 max-w-5xl mx-auto" aria-labelledby="voices-heading">

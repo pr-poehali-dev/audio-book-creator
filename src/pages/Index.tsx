@@ -209,7 +209,11 @@ export default function App() {
 
       <div className="pt-16">
         {screen === "home" && (
-          <HomeScreen setScreen={setScreen} onLoadCabinet={loadCabinet} />
+          <HomeScreen
+            setScreen={setScreen}
+            onLoadCabinet={loadCabinet}
+            onSelectBook={(bookText, bookTitle) => { setText(bookText); setTitle(bookTitle); }}
+          />
         )}
 
         {screen === "editor" && (
