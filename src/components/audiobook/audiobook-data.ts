@@ -166,7 +166,71 @@ export const USE_CASES = [
   { icon: "PenLine",       title: "Для писателей", desc: "Услышьте свой текст со стороны" },
 ];
 
-export type Screen = "home" | "editor" | "generating" | "result" | "cabinet";
+export type Screen =
+  | "home"
+  | "editor" | "generating" | "result" | "cabinet"
+  | "book-writer"
+  | "animation"
+  | "podcast"
+  | "poem";
+
+export interface CreativeModule {
+  id: Screen;
+  label: string;
+  icon: string;
+  color: string;
+  gradient: string;
+  tagline: string;
+  desc: string;
+}
+
+export const CREATIVE_MODULES: CreativeModule[] = [
+  {
+    id: "editor",
+    label: "Аудиокнига",
+    icon: "Headphones",
+    color: "#3b82f6",
+    gradient: "from-blue-500 to-indigo-600",
+    tagline: "Текст → MP3",
+    desc: "Загрузи файл или текст, выбери голос — получи готовую аудиокнигу за минуту",
+  },
+  {
+    id: "book-writer",
+    label: "Написать книгу",
+    icon: "BookOpen",
+    color: "#8b5cf6",
+    gradient: "from-violet-500 to-purple-700",
+    tagline: "Идея → Рукопись",
+    desc: "Конструктор сюжета, персонажей и глав — пиши книгу по шагам",
+  },
+  {
+    id: "animation",
+    label: "Мультфильм",
+    icon: "Clapperboard",
+    color: "#f59e0b",
+    gradient: "from-amber-400 to-orange-600",
+    tagline: "Идея → Сценарий",
+    desc: "Создай раскадровку, пропиши диалоги и сцены для мультфильма или фильма",
+  },
+  {
+    id: "podcast",
+    label: "Подкаст",
+    icon: "Mic2",
+    color: "#10b981",
+    gradient: "from-emerald-400 to-teal-600",
+    tagline: "Тема → Эпизод",
+    desc: "Структура выпуска, вопросы гостю, тезисы — всё для идеального подкаста",
+  },
+  {
+    id: "poem",
+    label: "Стихи и песни",
+    icon: "Music2",
+    color: "#ec4899",
+    gradient: "from-pink-400 to-rose-600",
+    tagline: "Чувство → Текст",
+    desc: "Пиши стихи, рифмуй строфы, создавай тексты песен с подсказками",
+  },
+];
 
 export interface Project {
   id: string;
