@@ -2,46 +2,13 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
 import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
-import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
+import { SaveStatus, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
+import { AB_COLOR, TEMPLATES, Character, Chapter, OutlineItem, IdeaItem } from "@/components/audiobook/bookwriter-data";
+import { BookWriterSetupStep, BookWriterCharactersStep } from "@/components/audiobook/BookWriterSetupStep";
+import { BookWriterChaptersStep } from "@/components/audiobook/BookWriterChaptersStep";
+import { BookWriterWriteStep } from "@/components/audiobook/BookWriterWriteStep";
 
 interface Props { setScreen: (s: Screen) => void; }
-
-const AB_COLOR = "#8b5cf6";
-
-interface OutlineItem { title: string; summary: string; }
-interface IdeaItem { title: string; premise: string; }
-
-const GENRES = ["Роман", "Фантастика", "Детектив", "Сказка", "Исторический", "Приключения", "Ужасы", "Романтика"];
-
-const TEMPLATES = [
-  {
-    id: "hero",
-    title: "Путь героя",
-    desc: "Классическая структура: герой, вызов, испытания, победа",
-    chapters: ["Обычный мир", "Зов приключений", "Пересечение порога", "Испытания и союзники", "Главное испытание", "Награда", "Возвращение домой"],
-  },
-  {
-    id: "mystery",
-    title: "Детектив",
-    desc: "Тайна, расследование, разгадка",
-    chapters: ["Преступление", "Первые улики", "Подозреваемые", "Ложный след", "Поворот", "Разоблачение", "Развязка"],
-  },
-  {
-    id: "romance",
-    title: "Любовный роман",
-    desc: "Встреча, чувства, конфликт, воссоединение",
-    chapters: ["Встреча", "Притяжение", "Первые чувства", "Препятствие", "Разлука", "Осознание", "Счастливый финал"],
-  },
-  {
-    id: "custom",
-    title: "Своя структура",
-    desc: "Создай главы самостоятельно",
-    chapters: [],
-  },
-];
-
-interface Character { id: string; name: string; role: string; trait: string; }
-interface Chapter { id: string; title: string; summary: string; wordCount: number; }
 
 export function BookWriterScreen({ setScreen }: Props) {
   const [step, setStep] = useState<"setup" | "characters" | "chapters" | "write">("setup");
@@ -236,285 +203,45 @@ export function BookWriterScreen({ setScreen }: Props) {
 
       {/* STEP 1: Setup */}
       {step === "setup" && (
-        <div className="flex flex-col gap-6 animate-fade-in">
-          <div className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-            <div>
-              <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Название книги</label>
-              <input value={bookTitle} onChange={e => setBookTitle(e.target.value)}
-                placeholder="Введите название…"
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all"
-                style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                onFocus={e => (e.currentTarget.style.borderColor = "#8b5cf6")}
-                onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Жанр</label>
-              <div className="flex flex-wrap gap-2">
-                {GENRES.map(g => (
-                  <button key={g} onClick={() => setGenre(g)}
-                    className="px-3 py-1.5 rounded-lg text-sm transition-all"
-                    style={genre === g
-                      ? { background: "rgba(139,92,246,0.15)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.4)" }
-                      : { background: "var(--ab-page-bg)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium" style={{ color: "var(--ab-text-secondary)" }}>О чём книга? (идея в 1-2 предложениях)</label>
-                <AIButton size="sm" variant="ghost" color={AB_COLOR}
-                  loading={loading && loadingTask === "book-ideas"}
-                  label="Придумать идею" onClick={genIdeas} />
-              </div>
-              <textarea value={premise} onChange={e => setPremise(e.target.value)}
-                placeholder="Молодой детектив расследует исчезновение картины из закрытого музея и обнаруживает заговор…"
-                rows={3}
-                className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all resize-none"
-                style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                onFocus={e => (e.currentTarget.style.borderColor = "#8b5cf6")}
-                onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-              {ideas.length > 0 && (
-                <div className="flex flex-col gap-2 mt-3">
-                  {ideas.map((idea, i) => (
-                    <button key={i} onClick={() => { setBookTitle(idea.title); setPremise(idea.premise); setIdeas([]); }}
-                      className="text-left p-3 rounded-xl text-xs transition-all hover:shadow-sm"
-                      style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)" }}>
-                      <div className="font-semibold mb-0.5" style={{ color: AB_COLOR }}>{idea.title}</div>
-                      <div style={{ color: "var(--ab-text-secondary)" }}>{idea.premise}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-sm font-medium mb-3" style={{ color: "var(--ab-text-secondary)" }}>Выбери шаблон структуры</div>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {TEMPLATES.map(t => (
-                <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
-                  className="rounded-2xl p-5 text-left transition-all hover:shadow-md"
-                  style={selectedTemplate === t.id
-                    ? { background: "rgba(139,92,246,0.1)", border: "2px solid rgba(139,92,246,0.5)" }
-                    : { background: "var(--ab-card)", border: "2px solid var(--ab-border)" }}>
-                  <div className="font-semibold text-sm mb-1" style={{ color: "var(--ab-text-primary)" }}>{t.title}</div>
-                  <div className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>{t.desc}</div>
-                  {t.chapters.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {t.chapters.slice(0, 3).map(ch => (
-                        <span key={ch} className="text-[10px] px-2 py-0.5 rounded-full"
-                          style={{ background: "rgba(139,92,246,0.08)", color: "#8b5cf6" }}>{ch}</span>
-                      ))}
-                      {t.chapters.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full"
-                        style={{ background: "rgba(139,92,246,0.08)", color: "#8b5cf6" }}>+{t.chapters.length - 3}</span>}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={() => setStep("characters")}
-            disabled={!bookTitle.trim()}
-            className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
-            Далее — Персонажи →
-          </button>
-        </div>
+        <BookWriterSetupStep
+          bookTitle={bookTitle} setBookTitle={setBookTitle}
+          genre={genre} setGenre={setGenre}
+          premise={premise} setPremise={setPremise}
+          selectedTemplate={selectedTemplate} setSelectedTemplate={setSelectedTemplate}
+          ideas={ideas} setIdeas={setIdeas}
+          loading={loading} loadingTask={loadingTask}
+          genIdeas={genIdeas} setStep={setStep}
+        />
       )}
 
       {/* STEP 2: Characters */}
       {step === "characters" && (
-        <div className="flex flex-col gap-5 animate-fade-in">
-          <div className="flex flex-col gap-3">
-            {characters.map(char => (
-              <div key={char.id} className="rounded-2xl p-5 flex items-start gap-4"
-                style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg shrink-0 text-white"
-                  style={{ background: "linear-gradient(135deg,#8b5cf6,#ec4899)" }}>
-                  {char.name[0]}
-                </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <input value={char.name}
-                    onChange={e => setCharacters(c => c.map(x => x.id === char.id ? { ...x, name: e.target.value } : x))}
-                    className="font-semibold text-sm bg-transparent focus:outline-none border-b transition-colors"
-                    style={{ color: "var(--ab-text-primary)", borderColor: "var(--ab-border)" }} />
-                  <div className="flex gap-2 flex-wrap">
-                    {["Протагонист", "Антагонист", "Наставник", "Друг", "Любовный интерес", "Злодей"].map(r => (
-                      <button key={r} onClick={() => setCharacters(c => c.map(x => x.id === char.id ? { ...x, role: r } : x))}
-                        className="text-[11px] px-2 py-1 rounded-full transition-all"
-                        style={char.role === r
-                          ? { background: "rgba(139,92,246,0.15)", color: "#8b5cf6" }
-                          : { background: "var(--ab-page-bg)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                  <input value={char.trait}
-                    onChange={e => setCharacters(c => c.map(x => x.id === char.id ? { ...x, trait: e.target.value } : x))}
-                    placeholder="Черты характера…"
-                    className="text-xs bg-transparent focus:outline-none"
-                    style={{ color: "var(--ab-text-secondary)" }} />
-                </div>
-                <button onClick={() => setCharacters(c => c.filter(x => x.id !== char.id))}
-                  className="opacity-40 hover:opacity-100 transition-opacity mt-1"
-                  style={{ color: "var(--ab-text-secondary)" }}>
-                  <Icon name="X" size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input value={newCharName} onChange={e => setNewCharName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addCharacter()}
-              placeholder="Имя нового персонажа…"
-              className="flex-1 px-4 py-3 rounded-xl text-sm focus:outline-none"
-              style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)", color: "var(--ab-text-primary)" }} />
-            <button onClick={addCharacter}
-              className="px-5 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90"
-              style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
-              <Icon name="Plus" size={16} />
-            </button>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setStep("setup")} className="flex-1 py-3 rounded-xl font-medium transition-all"
-              style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
-              ← Назад
-            </button>
-            <button onClick={initChapters} className="flex-2 px-8 py-3 rounded-xl text-white font-bold transition-all hover:opacity-90"
-              style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
-              Далее — Главы →
-            </button>
-          </div>
-        </div>
+        <BookWriterCharactersStep
+          characters={characters} setCharacters={setCharacters}
+          newCharName={newCharName} setNewCharName={setNewCharName}
+          addCharacter={addCharacter} initChapters={initChapters} setStep={setStep}
+        />
       )}
 
       {/* STEP 3: Chapters */}
       {step === "chapters" && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          {chapters.map((ch, i) => (
-            <div key={ch.id} className="rounded-2xl p-5" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-              <div className="flex items-center gap-3 mb-3">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                  style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>{i + 1}</span>
-                <input value={ch.title}
-                  onChange={e => setChapters(c => c.map(x => x.id === ch.id ? { ...x, title: e.target.value } : x))}
-                  className="flex-1 font-semibold text-sm bg-transparent focus:outline-none"
-                  style={{ color: "var(--ab-text-primary)" }} />
-                <button onClick={() => setChapters(c => c.filter(x => x.id !== ch.id))}
-                  className="opacity-40 hover:opacity-100 transition-opacity"
-                  style={{ color: "var(--ab-text-secondary)" }}>
-                  <Icon name="Trash2" size={14} />
-                </button>
-              </div>
-              <textarea value={ch.summary}
-                onChange={e => updateChapterSummary(ch.id, e.target.value)}
-                placeholder="Краткое содержание главы — что происходит, какие события…"
-                rows={2}
-                className="w-full text-xs bg-transparent focus:outline-none resize-none"
-                style={{ color: "var(--ab-text-secondary)" }} />
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <button onClick={addChapter}
-              className="flex-1 py-3 rounded-2xl text-sm font-medium transition-all flex items-center justify-center gap-2"
-              style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "2px dashed var(--ab-border)" }}>
-              <Icon name="Plus" size={15} />Добавить главу
-            </button>
-            <AIButton color={AB_COLOR} loading={loading && loadingTask === "book-outline"}
-              label="Структура от ИИ" onClick={genOutline} disabled={!bookTitle.trim()} />
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => setStep("characters")} className="flex-1 py-3 rounded-xl font-medium"
-              style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
-              ← Назад
-            </button>
-            <button onClick={() => setStep("write")} className="flex-2 px-8 py-3 rounded-xl text-white font-bold hover:opacity-90"
-              style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
-              Начать писать →
-            </button>
-          </div>
-        </div>
+        <BookWriterChaptersStep
+          chapters={chapters} setChapters={setChapters}
+          updateChapterSummary={updateChapterSummary} addChapter={addChapter}
+          genOutline={genOutline} loading={loading} loadingTask={loadingTask}
+          bookTitle={bookTitle} setStep={setStep}
+        />
       )}
 
       {/* STEP 4: Write */}
       {step === "write" && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="grid lg:grid-cols-3 gap-4">
-            {/* Chapter list */}
-            <div className="flex flex-col gap-2">
-              {chapters.map((ch, i) => (
-                <button key={ch.id} onClick={() => setActiveChapter(ch.id)}
-                  className="p-4 rounded-xl text-left transition-all"
-                  style={activeChapter === ch.id
-                    ? { background: "rgba(139,92,246,0.12)", border: "2px solid rgba(139,92,246,0.4)" }
-                    : { background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold" style={{ color: "#8b5cf6" }}>{i + 1}</span>
-                    <span className="text-sm font-medium truncate" style={{ color: "var(--ab-text-primary)" }}>{ch.title}</span>
-                  </div>
-                  {ch.wordCount > 0 && (
-                    <div className="text-[11px] mt-1" style={{ color: "var(--ab-text-secondary)" }}>{ch.wordCount} слов</div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Editor */}
-            <div className="lg:col-span-2">
-              {activeChapter ? (() => {
-                const ch = chapters.find(x => x.id === activeChapter)!;
-                return (
-                  <div className="flex flex-col gap-3">
-                    <div className="rounded-2xl overflow-hidden" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                      <div className="px-5 py-4 flex items-center justify-between gap-2 flex-wrap"
-                        style={{ borderBottom: "1px solid var(--ab-border)" }}>
-                        <div className="font-semibold text-sm" style={{ color: "var(--ab-text-primary)" }}>{ch.title}</div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>{ch.wordCount} слов</span>
-                          <AIButton size="sm" color={AB_COLOR}
-                            loading={loading && loadingTask === "book-chapter"}
-                            label={chapterText[activeChapter] ? "Переписать ИИ" : "Написать главу ИИ"}
-                            onClick={() => genChapter(activeChapter)} />
-                        </div>
-                      </div>
-                      {ch.summary && (
-                        <div className="px-5 py-3 text-xs italic border-l-2 mx-5 mt-4 rounded"
-                          style={{ borderColor: "#8b5cf6", background: "rgba(139,92,246,0.05)", color: "var(--ab-text-secondary)" }}>
-                          📝 {ch.summary}
-                        </div>
-                      )}
-                      <textarea
-                        value={chapterText[activeChapter] || ""}
-                        onChange={e => updateChapterText(activeChapter, e.target.value)}
-                        placeholder={`Начни писать «${ch.title}»…\n\nИли нажми «Написать главу ИИ» — нейросеть создаст текст по твоей задумке.`}
-                        className="w-full px-5 py-4 min-h-[400px] bg-transparent focus:outline-none text-sm leading-relaxed resize-none"
-                        style={{ color: "var(--ab-text-primary)" }} />
-                    </div>
-                    {chapterText[activeChapter] && (
-                      <div className="flex items-center gap-2">
-                        <AIButton size="sm" variant="ghost" color={AB_COLOR}
-                          loading={voicing} label="Озвучить главу"
-                          onClick={() => voiceChapter(activeChapter)} />
-                      </div>
-                    )}
-                    {audioUrl && (
-                      <MiniPlayer url={audioUrl} title={`${bookTitle} — ${ch.title}`} color={AB_COLOR} onClose={() => setAudioUrl("")} />
-                    )}
-                  </div>
-                );
-              })() : (
-                <div className="h-64 rounded-2xl flex flex-col items-center justify-center gap-3"
-                  style={{ background: "var(--ab-card)", border: "2px dashed var(--ab-border)" }}>
-                  <Icon name="BookOpen" size={32} className="opacity-30" style={{ color: "var(--ab-text-secondary)" } as React.CSSProperties} />
-                  <div className="text-sm" style={{ color: "var(--ab-text-secondary)" }}>Выбери главу слева, чтобы начать писать</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <BookWriterWriteStep
+          chapters={chapters} activeChapter={activeChapter} setActiveChapter={setActiveChapter}
+          chapterText={chapterText} updateChapterText={updateChapterText}
+          genChapter={genChapter} voiceChapter={voiceChapter}
+          loading={loading} loadingTask={loadingTask} voicing={voicing}
+          audioUrl={audioUrl} setAudioUrl={setAudioUrl} bookTitle={bookTitle}
+        />
       )}
 
       <ErrorToast message={aiError || ttsError} onClose={() => { setAiError(""); setTtsError(""); }} />
