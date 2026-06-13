@@ -1,6 +1,14 @@
 export const TTS_URL = "https://functions.poehali.dev/ce35a220-1add-443c-976f-1406e37ffb0e";
 export const PARSE_URL = "https://functions.poehali.dev/6eb61321-5f6e-40f3-b5ba-2e1a9fe7dfcc";
+export const AI_URL = "https://functions.poehali.dev/506071b5-d529-4a0c-ac9e-0cb08f237591";
+export const PROJECTS_URL = "https://functions.poehali.dev/5c7ea0e4-5ee6-49b1-832d-eeb32b0d2e12";
 export const SUPPORTED_EXTS = ["txt", "pdf", "epub", "docx"];
+
+export const AI_MODELS = [
+  { id: "openai/gpt-4o-mini",          name: "GPT-4o mini", desc: "Быстрая, для большинства задач" },
+  { id: "openai/gpt-4o",               name: "GPT-4o",      desc: "Максимальное качество" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5",  desc: "Длинные тексты, проза" },
+];
 
 export const VOICES = [
   { id: "alena",   name: "Алёна",   gender: "Женский", style: "Нейтральный",    emoji: "👩" },

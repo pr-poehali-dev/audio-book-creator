@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET without user_id returns 400",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create project",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "user_id": "test_user_ci",
+        "module": "poem",
+        "title": "Тестовый стих",
+        "data": { "verses": [] },
+        "preview": "превью"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "success": true },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "List projects",
+      "method": "GET",
+      "path": "/?user_id=test_user_ci_empty_xyz",
+      "expectedStatus": 200,
+      "expectedBody": { "projects": [] },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

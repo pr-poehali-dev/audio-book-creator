@@ -1,11 +1,18 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
+import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
+import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
 
 interface Props { setScreen: (s: Screen) => void; }
 
+const AB_COLOR = "#10b981";
+
 interface Segment { id: string; type: string; title: string; duration: string; notes: string; }
 interface Question { id: string; text: string; followUp: string; }
+
+interface StructureItem { type?: string; title?: string; duration?: string; notes?: string; }
+interface QuestionItem { text?: string; followUp?: string; }
 
 const SEGMENT_TYPES = [
   { id: "intro", label: "Интро", color: "#3b82f6", icon: "Play" },
@@ -40,6 +47,106 @@ export function PodcastScreen({ setScreen }: Props) {
     { id: "1", text: "", followUp: "" },
   ]);
   const [activeSegment, setActiveSegment] = useState("1");
+
+  // ─── ИИ-движок: генерация, сохранение, озвучка ───
+  const { generate, loading: aiLoading, loadingTask, error: aiError, setError: setAiError } = useAI("openai/gpt-4o-mini");
+  const { save, list, load, remove, saving, savedAt } = useSave("podcast");
+  const { voice, voicing, audioUrl, setAudioUrl, error: ttsError, setError: setTtsError } = useTTS();
+
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  const handleSave = async () => {
+    const id = await save(
+      projectId,
+      episodeTitle || "Без названия",
+      { podcastName, episodeTitle, format, mainIdea, guestName, segments, questions },
+      mainIdea,
+    );
+    if (id) setProjectId(id);
+  };
+
+  const openDrawer = async () => {
+    setDrawerOpen(true);
+    setLoadingProjects(true);
+    setSavedProjects(await list());
+    setLoadingProjects(false);
+  };
+
+  const handleLoadProject = async (id: string) => {
+    const proj = await load(id);
+    if (proj?.data) {
+      const d = proj.data as {
+        podcastName?: string; episodeTitle?: string; format?: string; mainIdea?: string;
+        guestName?: string; segments?: Segment[]; questions?: Question[];
+      };
+      setPodcastName(d.podcastName || "");
+      setEpisodeTitle(d.episodeTitle || "");
+      setFormat(d.format || "solo");
+      setMainIdea(d.mainIdea || "");
+      setGuestName(d.guestName || "");
+      if (d.segments && d.segments.length) {
+        setSegments(d.segments);
+        setActiveSegment(d.segments[0].id);
+      }
+      if (d.questions && d.questions.length) setQuestions(d.questions);
+      setProjectId(proj.id);
+      setStep("structure");
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (await remove(id)) {
+      setSavedProjects(p => p.filter(x => x.id !== id));
+      if (id === projectId) setProjectId(null);
+    }
+  };
+
+  const generateStructure = async () => {
+    const result = await generate("podcast-structure", { episodeTitle, mainIdea, format });
+    if (result?.json && result.json.length) {
+      const items = result.json as StructureItem[];
+      const newSegments: Segment[] = items.map((it, i) => ({
+        id: `${Date.now()}-${i}`,
+        type: it.type && SEGMENT_TYPES.some(s => s.id === it.type) ? it.type : "topic",
+        title: it.title || "Блок",
+        duration: it.duration || "5:00",
+        notes: it.notes || "",
+      }));
+      setSegments(newSegments);
+      setActiveSegment(newSegments[0].id);
+      setStep("structure");
+    }
+  };
+
+  const generateSegmentScript = async (seg: Segment) => {
+    const result = await generate("podcast-script", {
+      podcastName, episodeTitle, format, mainIdea,
+      segmentTitle: seg.title, segmentType: seg.type,
+    });
+    if (result?.text) {
+      setSegments(s => s.map(x => x.id === seg.id ? { ...x, notes: result.text } : x));
+    }
+  };
+
+  const generateQuestions = async () => {
+    const result = await generate("podcast-questions", { episodeTitle, guestName, mainIdea });
+    if (result?.json && result.json.length) {
+      const items = result.json as QuestionItem[];
+      const newQuestions: Question[] = items.map((it, i) => ({
+        id: `${Date.now()}-${i}`,
+        text: it.text || "",
+        followUp: it.followUp || "",
+      }));
+      setQuestions(newQuestions);
+    }
+  };
+
+  const voiceSegment = async (seg: Segment) => {
+    await voice(seg.notes, `${episodeTitle} — ${seg.title}`, "alena", 1.0);
+  };
 
   const addSegment = (type: string) => {
     const segType = SEGMENT_TYPES.find(s => s.id === type)!;
@@ -103,13 +210,21 @@ export function PodcastScreen({ setScreen }: Props) {
             {podcastName || "Подкаст"} · {segments.length} блоков · ~{totalMin}:{String(totalSec).padStart(2, "0")} мин
           </div>
         </div>
-        {step !== "setup" && (
-          <button onClick={exportNotes}
-            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>
-            <Icon name="Download" size={14} />Заметки
+        <div className="ml-auto flex items-center gap-2">
+          {step !== "setup" && (
+            <button onClick={exportNotes}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>
+              <Icon name="Download" size={14} />Заметки
+            </button>
+          )}
+          <SaveStatus saving={saving} savedAt={savedAt} onSave={handleSave} color={AB_COLOR} />
+          <button onClick={openDrawer}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
+            <Icon name="FolderOpen" size={13} />Мои черновики
           </button>
-        )}
+        </div>
       </div>
 
       {/* Steps */}
@@ -195,11 +310,20 @@ export function PodcastScreen({ setScreen }: Props) {
             </div>
           </div>
 
-          <button onClick={() => setStep("structure")} disabled={!episodeTitle.trim()}
-            className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>
-            Составить структуру →
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setStep("structure")} disabled={!episodeTitle.trim()}
+              className="flex-1 py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>
+              Составить структуру →
+            </button>
+            <AIButton
+              onClick={generateStructure}
+              loading={aiLoading && loadingTask === "podcast-structure"}
+              disabled={!episodeTitle.trim()}
+              label="Сгенерировать структуру ИИ"
+              color={AB_COLOR}
+            />
+          </div>
         </div>
       )}
 
@@ -265,8 +389,18 @@ export function PodcastScreen({ setScreen }: Props) {
                       className="w-16 text-center text-sm bg-transparent focus:outline-none rounded px-2 py-1"
                       style={{ color: t.color, border: `1px solid ${t.color}30`, background: `${t.color}08` }} />
                   </div>
-                  <div className="p-5">
-                    <label className="text-xs font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Заметки и тезисы</label>
+                  <div className="p-5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium block" style={{ color: "var(--ab-text-secondary)" }}>Заметки и тезисы</label>
+                      <AIButton
+                        onClick={() => generateSegmentScript(currentSeg)}
+                        loading={aiLoading && loadingTask === "podcast-script"}
+                        label="Написать блок ИИ"
+                        color={AB_COLOR}
+                        size="sm"
+                        variant="ghost"
+                      />
+                    </div>
                     <textarea value={currentSeg.notes}
                       onChange={e => setSegments(s => s.map(x => x.id === currentSeg.id ? { ...x, notes: e.target.value } : x))}
                       placeholder={
@@ -277,6 +411,24 @@ export function PodcastScreen({ setScreen }: Props) {
                       rows={8}
                       className="w-full bg-transparent focus:outline-none text-sm leading-relaxed resize-none"
                       style={{ color: "var(--ab-text-primary)" }} />
+                    <div className="flex justify-start">
+                      <AIButton
+                        onClick={() => voiceSegment(currentSeg)}
+                        loading={voicing}
+                        label="Озвучить блок"
+                        color={AB_COLOR}
+                        size="sm"
+                        variant="ghost"
+                      />
+                    </div>
+                    {audioUrl && (
+                      <MiniPlayer
+                        url={audioUrl}
+                        title={`${episodeTitle || "Эпизод"} — ${currentSeg.title}`}
+                        color={AB_COLOR}
+                        onClose={() => setAudioUrl("")}
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -297,11 +449,18 @@ export function PodcastScreen({ setScreen }: Props) {
       {/* STEP 3: Questions */}
       {step === "questions" && (
         <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="rounded-2xl p-5 mb-2"
+          <div className="rounded-2xl p-5 mb-2 flex items-center justify-between gap-3 flex-wrap"
             style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
             <div className="text-sm font-medium" style={{ color: "#10b981" }}>
               {guestName ? `Вопросы для ${guestName}` : "Вопросы и план беседы"}
             </div>
+            <AIButton
+              onClick={generateQuestions}
+              loading={aiLoading && loadingTask === "podcast-questions"}
+              label="Сгенерировать вопросы ИИ"
+              color={AB_COLOR}
+              size="sm"
+            />
           </div>
           {questions.map((q, i) => (
             <div key={q.id} className="rounded-2xl p-5 flex flex-col gap-3"
@@ -339,6 +498,20 @@ export function PodcastScreen({ setScreen }: Props) {
           </button>
         </div>
       )}
+
+      <ErrorToast
+        message={aiError || ttsError}
+        onClose={() => { setAiError(""); setTtsError(""); }}
+      />
+      <ProjectsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projects={savedProjects}
+        loading={loadingProjects}
+        color={AB_COLOR}
+        onLoad={handleLoadProject}
+        onDelete={handleDeleteProject}
+      />
     </div>
   );
 }

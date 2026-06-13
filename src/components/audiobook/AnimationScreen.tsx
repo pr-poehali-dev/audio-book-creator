@@ -1,8 +1,20 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
+import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
+import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
 
 interface Props { setScreen: (s: Screen) => void; }
+
+const AB_COLOR = "#f59e0b";
+
+interface StoryboardItem {
+  location?: string;
+  time?: string;
+  mood?: string;
+  action?: string;
+  dialogue?: string;
+}
 
 interface SceneCard {
   id: string;
@@ -33,6 +45,102 @@ export function AnimationScreen({ setScreen }: Props) {
     { id: "1", number: 1, location: "Лес", time: "День", action: "", dialogue: "", mood: "Радость", duration: "0:30" },
   ]);
   const [activeScene, setActiveScene] = useState("1");
+
+  // ─── ИИ-движок: генерация, сохранение, озвучка ───
+  const { generate, loading: aiLoading, loadingTask, error: aiError, setError: setAiError } = useAI("openai/gpt-4o-mini");
+  const { save, list, load, remove, saving, savedAt } = useSave("animation");
+  const { voice, voicing, audioUrl, setAudioUrl, error: ttsError, setError: setTtsError } = useTTS();
+
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  const formatLabel = FORMATS.find(f => f.id === format)?.label || format;
+
+  const handleSave = async () => {
+    const id = await save(projectId, projectTitle || "Без названия", { projectTitle, format, logline, scenes }, logline);
+    if (id) setProjectId(id);
+  };
+
+  const openDrawer = async () => {
+    setDrawerOpen(true);
+    setLoadingProjects(true);
+    setSavedProjects(await list());
+    setLoadingProjects(false);
+  };
+
+  const handleLoadProject = async (id: string) => {
+    const proj = await load(id);
+    if (proj?.data) {
+      const d = proj.data as { projectTitle?: string; format?: string; logline?: string; scenes?: SceneCard[] };
+      setProjectTitle(d.projectTitle || "");
+      setFormat(d.format || "cartoon");
+      setLogline(d.logline || "");
+      if (d.scenes && d.scenes.length) {
+        setScenes(d.scenes);
+        setActiveScene(d.scenes[0].id);
+      }
+      setProjectId(proj.id);
+      setStep("scenes");
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (await remove(id)) {
+      setSavedProjects(p => p.filter(x => x.id !== id));
+      if (id === projectId) setProjectId(null);
+    }
+  };
+
+  const generateStoryboard = async () => {
+    const result = await generate("animation-storyboard", { projectTitle, format: formatLabel, logline, sceneCount: 5 });
+    if (result?.json && result.json.length) {
+      const items = result.json as StoryboardItem[];
+      const newScenes: SceneCard[] = items.map((it, i) => ({
+        id: `${Date.now()}-${i}`,
+        number: i + 1,
+        location: it.location || "",
+        time: it.time || "День",
+        action: it.action || "",
+        dialogue: it.dialogue || "",
+        mood: it.mood || "Спокойствие",
+        duration: "0:30",
+      }));
+      setScenes(newScenes);
+      setActiveScene(newScenes[0].id);
+      setStep("scenes");
+    }
+  };
+
+  const fillScene = async (scene: SceneCard) => {
+    const result = await generate("animation-scene", {
+      projectTitle, format: formatLabel, logline,
+      location: scene.location, time: scene.time, mood: scene.mood,
+    });
+    if (result?.text) {
+      const text = result.text;
+      const diaIdx = text.indexOf("ДИАЛОГ:");
+      const actIdx = text.indexOf("ДЕЙСТВИЕ:");
+      let action = "";
+      let dialogue = "";
+      if (diaIdx >= 0) {
+        const actStart = actIdx >= 0 ? actIdx + "ДЕЙСТВИЕ:".length : 0;
+        action = text.slice(actStart, diaIdx).trim();
+        dialogue = text.slice(diaIdx + "ДИАЛОГ:".length).trim();
+      } else {
+        action = (actIdx >= 0 ? text.slice(actIdx + "ДЕЙСТВИЕ:".length) : text).trim();
+      }
+      setScenes(s => s.map(sc => sc.id === scene.id ? { ...sc, action, dialogue } : sc));
+    }
+  };
+
+  const voiceScene = async (scene: SceneCard) => {
+    const parts: string[] = [];
+    if (scene.action) parts.push(scene.action);
+    if (scene.dialogue) parts.push(scene.dialogue);
+    await voice(parts.join("\n\n"), `${projectTitle} сцена ${scene.number}`, "filipp", 1.0);
+  };
 
   const addScene = () => {
     const id = String(Date.now());
@@ -82,12 +190,20 @@ export function AnimationScreen({ setScreen }: Props) {
           </h1>
           <div className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>{scenes.length} сцен · {FORMATS.find(f => f.id === format)?.label}</div>
         </div>
-        {step === "scenes" && (
-          <button onClick={exportScript} className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" }}>
-            <Icon name="Download" size={14} />Скачать сценарий
+        <div className="ml-auto flex items-center gap-2">
+          {step === "scenes" && (
+            <button onClick={exportScript} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" }}>
+              <Icon name="Download" size={14} />Скачать сценарий
+            </button>
+          )}
+          <SaveStatus saving={saving} savedAt={savedAt} onSave={handleSave} color={AB_COLOR} />
+          <button onClick={openDrawer}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
+            <Icon name="FolderOpen" size={13} />Мои черновики
           </button>
-        )}
+        </div>
       </div>
 
       {/* Steps */}
@@ -158,11 +274,20 @@ export function AnimationScreen({ setScreen }: Props) {
             </div>
           </div>
 
-          <button onClick={() => setStep("scenes")} disabled={!projectTitle.trim()}
-            className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
-            style={{ background: "linear-gradient(135deg,#f59e0b,#ea580c)" }}>
-            Создать раскадровку →
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={() => setStep("scenes")} disabled={!projectTitle.trim()}
+              className="flex-1 py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg,#f59e0b,#ea580c)" }}>
+              Создать раскадровку →
+            </button>
+            <AIButton
+              onClick={generateStoryboard}
+              loading={aiLoading && loadingTask === "animation-storyboard"}
+              disabled={!projectTitle.trim()}
+              label="Сгенерировать раскадровку ИИ"
+              color={AB_COLOR}
+            />
+          </div>
         </div>
       )}
 
@@ -234,6 +359,17 @@ export function AnimationScreen({ setScreen }: Props) {
                   </div>
                 </div>
 
+                <div className="flex justify-end">
+                  <AIButton
+                    onClick={() => fillScene(currentScene)}
+                    loading={aiLoading && loadingTask === "animation-scene"}
+                    label="Заполнить сцену ИИ"
+                    color={AB_COLOR}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+
                 <div>
                   <label className="text-xs font-medium mb-1 block" style={{ color: "var(--ab-text-secondary)" }}>Действие / описание</label>
                   <textarea value={currentScene.action} onChange={e => updateScene(currentScene.id, "action", e.target.value)}
@@ -272,11 +408,45 @@ export function AnimationScreen({ setScreen }: Props) {
                       style={{ background: "var(--ab-page-bg)", border: "1px solid var(--ab-border)", color: "var(--ab-text-primary)" }} />
                   </div>
                 </div>
+
+                <div className="flex justify-start">
+                  <AIButton
+                    onClick={() => voiceScene(currentScene)}
+                    loading={voicing}
+                    label="Озвучить сцену"
+                    color={AB_COLOR}
+                    size="sm"
+                    variant="ghost"
+                  />
+                </div>
+
+                {audioUrl && (
+                  <MiniPlayer
+                    url={audioUrl}
+                    title={`${projectTitle || "Сценарий"} · сцена ${currentScene.number}`}
+                    color={AB_COLOR}
+                    onClose={() => setAudioUrl("")}
+                  />
+                )}
               </div>
             </div>
           )}
         </div>
       )}
+
+      <ErrorToast
+        message={aiError || ttsError}
+        onClose={() => { setAiError(""); setTtsError(""); }}
+      />
+      <ProjectsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projects={savedProjects}
+        loading={loadingProjects}
+        color={AB_COLOR}
+        onLoad={handleLoadProject}
+        onDelete={handleDeleteProject}
+      />
     </div>
   );
 }

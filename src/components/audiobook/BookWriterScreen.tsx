@@ -1,8 +1,15 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
+import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
+import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
 
 interface Props { setScreen: (s: Screen) => void; }
+
+const AB_COLOR = "#8b5cf6";
+
+interface OutlineItem { title: string; summary: string; }
+interface IdeaItem { title: string; premise: string; }
 
 const GENRES = ["Роман", "Фантастика", "Детектив", "Сказка", "Исторический", "Приключения", "Ужасы", "Романтика"];
 
@@ -50,7 +57,91 @@ export function BookWriterScreen({ setScreen }: Props) {
   const [chapterText, setChapterText] = useState<Record<string, string>>({});
   const [newCharName, setNewCharName] = useState("");
 
+  // ── Движок: ИИ, сохранение, озвучка ──────────────────────────────────────
+  const { generate, loading, loadingTask, error: aiError, setError: setAiError } = useAI("openai/gpt-4o-mini");
+  const { save, list, load, remove, saving, savedAt } = useSave("book");
+  const { voice, voicing, audioUrl, setAudioUrl, error: ttsError, setError: setTtsError } = useTTS();
+
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [ideas, setIdeas] = useState<IdeaItem[]>([]);
+
   const template = TEMPLATES.find(t => t.id === selectedTemplate)!;
+
+  // ── Генерация идей книги ──────────────────────────────────────────────────
+  const genIdeas = async () => {
+    const r = await generate("book-ideas", { genre });
+    if (r?.json) setIdeas(r.json as IdeaItem[]);
+  };
+
+  // ── Генерация структуры глав ИИ ───────────────────────────────────────────
+  const genOutline = async () => {
+    const r = await generate("book-outline", { bookTitle, genre, premise, chapterCount: 7 });
+    if (r?.json && r.json.length) {
+      const outline = r.json as OutlineItem[];
+      setChapters(outline.map((o, i) => ({ id: String(i + 1), title: o.title, summary: o.summary, wordCount: 0 })));
+      setStep("chapters");
+    }
+  };
+
+  // ── Генерация текста главы ИИ ──────────────────────────────────────────────
+  const genChapter = async (chapterId: string) => {
+    const ch = chapters.find(c => c.id === chapterId);
+    if (!ch) return;
+    const r = await generate("book-chapter", {
+      bookTitle, genre, premise,
+      chapterTitle: ch.title, summary: ch.summary,
+      characters, length: "средняя",
+    });
+    if (r?.text) updateChapterText(chapterId, r.text);
+  };
+
+  // ── Сохранение / загрузка ─────────────────────────────────────────────────
+  const handleSave = async () => {
+    const data = { bookTitle, genre, premise, selectedTemplate, characters, chapters, chapterText };
+    const preview = (premise || chapters.map(c => c.title).join(", ")).slice(0, 200);
+    const id = await save(projectId, bookTitle || "Без названия", data, preview);
+    if (id) setProjectId(id);
+  };
+
+  const openDrawer = async () => {
+    setDrawerOpen(true);
+    setLoadingProjects(true);
+    setSavedProjects(await list());
+    setLoadingProjects(false);
+  };
+
+  const handleLoad = async (id: string) => {
+    const p = await load(id);
+    if (p?.data) {
+      const d = p.data as {
+        bookTitle: string; genre: string; premise: string; selectedTemplate: string;
+        characters: Character[]; chapters: Chapter[]; chapterText: Record<string, string>;
+      };
+      setBookTitle(d.bookTitle || "");
+      setGenre(d.genre || "Роман");
+      setPremise(d.premise || "");
+      setSelectedTemplate(d.selectedTemplate || "hero");
+      setCharacters(d.characters || []);
+      setChapters(d.chapters || []);
+      setChapterText(d.chapterText || {});
+      setProjectId(id);
+      setStep(d.chapters?.length ? "write" : "setup");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (await remove(id)) setSavedProjects(p => p.filter(x => x.id !== id));
+  };
+
+  // ── Озвучка главы ─────────────────────────────────────────────────────────
+  const voiceChapter = async (chapterId: string) => {
+    const txt = chapterText[chapterId];
+    const ch = chapters.find(c => c.id === chapterId);
+    if (txt) await voice(txt, `${bookTitle} — ${ch?.title || "глава"}`, "filipp", 1.0);
+  };
 
   const initChapters = () => {
     const src = selectedTemplate === "custom"
@@ -104,13 +195,21 @@ export function BookWriterScreen({ setScreen }: Props) {
             {totalWords > 0 ? `${totalWords.toLocaleString("ru")} слов · ` : ""}{chapters.length} глав
           </div>
         </div>
-        {totalWords > 0 && (
-          <div className="ml-auto flex items-center gap-2 text-xs px-3 py-1.5 rounded-full"
-            style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
-            <Icon name="TrendingUp" size={12} />
-            {totalWords >= 1000 ? `${(totalWords / 1000).toFixed(1)}к` : totalWords} слов
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {totalWords > 0 && (
+            <div className="hidden sm:flex items-center gap-2 text-xs px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(139,92,246,0.1)", color: AB_COLOR }}>
+              <Icon name="TrendingUp" size={12} />
+              {totalWords >= 1000 ? `${(totalWords / 1000).toFixed(1)}к` : totalWords} слов
+            </div>
+          )}
+          <button onClick={openDrawer}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{ color: "var(--ab-text-secondary)" }}>
+            <Icon name="FolderOpen" size={14} /><span className="hidden sm:inline">Черновики</span>
+          </button>
+          <SaveStatus saving={saving} savedAt={savedAt} onSave={handleSave} color={AB_COLOR} />
+        </div>
       </div>
 
       {/* Steps */}
@@ -163,7 +262,12 @@ export function BookWriterScreen({ setScreen }: Props) {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>О чём книга? (идея в 1-2 предложениях)</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium" style={{ color: "var(--ab-text-secondary)" }}>О чём книга? (идея в 1-2 предложениях)</label>
+                <AIButton size="sm" variant="ghost" color={AB_COLOR}
+                  loading={loading && loadingTask === "book-ideas"}
+                  label="Придумать идею" onClick={genIdeas} />
+              </div>
               <textarea value={premise} onChange={e => setPremise(e.target.value)}
                 placeholder="Молодой детектив расследует исчезновение картины из закрытого музея и обнаруживает заговор…"
                 rows={3}
@@ -171,6 +275,18 @@ export function BookWriterScreen({ setScreen }: Props) {
                 style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
                 onFocus={e => (e.currentTarget.style.borderColor = "#8b5cf6")}
                 onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
+              {ideas.length > 0 && (
+                <div className="flex flex-col gap-2 mt-3">
+                  {ideas.map((idea, i) => (
+                    <button key={i} onClick={() => { setBookTitle(idea.title); setPremise(idea.premise); setIdeas([]); }}
+                      className="text-left p-3 rounded-xl text-xs transition-all hover:shadow-sm"
+                      style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)" }}>
+                      <div className="font-semibold mb-0.5" style={{ color: AB_COLOR }}>{idea.title}</div>
+                      <div style={{ color: "var(--ab-text-secondary)" }}>{idea.premise}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -301,11 +417,15 @@ export function BookWriterScreen({ setScreen }: Props) {
                 style={{ color: "var(--ab-text-secondary)" }} />
             </div>
           ))}
-          <button onClick={addChapter}
-            className="py-3 rounded-2xl text-sm font-medium transition-all flex items-center justify-center gap-2"
-            style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "2px dashed var(--ab-border)" }}>
-            <Icon name="Plus" size={15} />Добавить главу
-          </button>
+          <div className="flex gap-2">
+            <button onClick={addChapter}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium transition-all flex items-center justify-center gap-2"
+              style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "2px dashed var(--ab-border)" }}>
+              <Icon name="Plus" size={15} />Добавить главу
+            </button>
+            <AIButton color={AB_COLOR} loading={loading && loadingTask === "book-outline"}
+              label="Структура от ИИ" onClick={genOutline} disabled={!bookTitle.trim()} />
+          </div>
           <div className="flex gap-3">
             <button onClick={() => setStep("characters")} className="flex-1 py-3 rounded-xl font-medium"
               style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
@@ -347,26 +467,42 @@ export function BookWriterScreen({ setScreen }: Props) {
               {activeChapter ? (() => {
                 const ch = chapters.find(x => x.id === activeChapter)!;
                 return (
-                  <div className="rounded-2xl overflow-hidden" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                    <div className="px-5 py-4 flex items-center justify-between"
-                      style={{ borderBottom: "1px solid var(--ab-border)" }}>
-                      <div className="font-semibold text-sm" style={{ color: "var(--ab-text-primary)" }}>{ch.title}</div>
-                      <div className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>
-                        {ch.wordCount} слов
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-2xl overflow-hidden" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
+                      <div className="px-5 py-4 flex items-center justify-between gap-2 flex-wrap"
+                        style={{ borderBottom: "1px solid var(--ab-border)" }}>
+                        <div className="font-semibold text-sm" style={{ color: "var(--ab-text-primary)" }}>{ch.title}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>{ch.wordCount} слов</span>
+                          <AIButton size="sm" color={AB_COLOR}
+                            loading={loading && loadingTask === "book-chapter"}
+                            label={chapterText[activeChapter] ? "Переписать ИИ" : "Написать главу ИИ"}
+                            onClick={() => genChapter(activeChapter)} />
+                        </div>
                       </div>
+                      {ch.summary && (
+                        <div className="px-5 py-3 text-xs italic border-l-2 mx-5 mt-4 rounded"
+                          style={{ borderColor: "#8b5cf6", background: "rgba(139,92,246,0.05)", color: "var(--ab-text-secondary)" }}>
+                          📝 {ch.summary}
+                        </div>
+                      )}
+                      <textarea
+                        value={chapterText[activeChapter] || ""}
+                        onChange={e => updateChapterText(activeChapter, e.target.value)}
+                        placeholder={`Начни писать «${ch.title}»…\n\nИли нажми «Написать главу ИИ» — нейросеть создаст текст по твоей задумке.`}
+                        className="w-full px-5 py-4 min-h-[400px] bg-transparent focus:outline-none text-sm leading-relaxed resize-none"
+                        style={{ color: "var(--ab-text-primary)" }} />
                     </div>
-                    {ch.summary && (
-                      <div className="px-5 py-3 text-xs italic border-l-2 mx-5 mt-4 rounded"
-                        style={{ borderColor: "#8b5cf6", background: "rgba(139,92,246,0.05)", color: "var(--ab-text-secondary)" }}>
-                        📝 {ch.summary}
+                    {chapterText[activeChapter] && (
+                      <div className="flex items-center gap-2">
+                        <AIButton size="sm" variant="ghost" color={AB_COLOR}
+                          loading={voicing} label="Озвучить главу"
+                          onClick={() => voiceChapter(activeChapter)} />
                       </div>
                     )}
-                    <textarea
-                      value={chapterText[activeChapter] || ""}
-                      onChange={e => updateChapterText(activeChapter, e.target.value)}
-                      placeholder={`Начни писать «${ch.title}»…\n\nЭто твоё пространство. Пиши свободно.`}
-                      className="w-full px-5 py-4 min-h-[400px] bg-transparent focus:outline-none text-sm leading-relaxed resize-none"
-                      style={{ color: "var(--ab-text-primary)" }} />
+                    {audioUrl && (
+                      <MiniPlayer url={audioUrl} title={`${bookTitle} — ${ch.title}`} color={AB_COLOR} onClose={() => setAudioUrl("")} />
+                    )}
                   </div>
                 );
               })() : (
@@ -380,6 +516,17 @@ export function BookWriterScreen({ setScreen }: Props) {
           </div>
         </div>
       )}
+
+      <ErrorToast message={aiError || ttsError} onClose={() => { setAiError(""); setTtsError(""); }} />
+      <ProjectsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projects={savedProjects}
+        loading={loadingProjects}
+        color={AB_COLOR}
+        onLoad={handleLoad}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }

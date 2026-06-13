@@ -1,8 +1,12 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
+import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
+import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
 
 interface Props { setScreen: (s: Screen) => void; }
+
+const AB_COLOR = "#ec4899";
 
 const FORMS = [
   { id: "free", label: "Верлибр", desc: "Свободный стих без рифм", example: "Ветер касается листьев\nи уходит\nне прощаясь" },
@@ -33,6 +37,16 @@ export function PoemScreen({ setScreen }: Props) {
   const [helperInput, setHelperInput] = useState("");
   const [rhymeWords, setRhymeWords] = useState<string[]>([]);
 
+  // ─── ИИ-движок: генерация, сохранение, озвучка ───
+  const { generate, loading: aiLoading, loadingTask, error: aiError, setError: setAiError } = useAI("openai/gpt-4o-mini");
+  const { save, list, load, remove, saving, savedAt } = useSave("poem");
+  const { voice, voicing, audioUrl, setAudioUrl, error: ttsError, setError: setTtsError } = useTTS();
+
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
   const selectedForm = FORMS.find(f => f.id === form)!;
 
   const addVerse = (label: string) => {
@@ -48,22 +62,31 @@ export function PoemScreen({ setScreen }: Props) {
 
   const wordCount = fullText.trim().split(/\s+/).filter(Boolean).length;
 
-  const findRhymes = () => {
-    const word = helperInput.trim().toLowerCase();
+  const findRhymes = async () => {
+    const word = helperInput.trim();
     if (!word) return;
-    const endings: Record<string, string[]> = {
-      "ать": ["мечтать", "летать", "искать", "дышать", "кричать", "ждать", "молчать"],
-      "еть": ["гореть", "болеть", "звенеть", "успеть", "терпеть"],
-      "ить": ["любить", "жить", "говорить", "забыть", "открыть", "уйти"],
-      "ой": ["родной", "живой", "ночной", "тихой", "другой", "простой"],
-      "ой!": ["родной", "живой"],
-      "ет": ["идёт", "поёт", "живёт", "цветёт", "ждёт"],
-      "ла": ["была", "пришла", "спала", "ждала", "жила"],
-      "ен": ["день", "тень", "лень", "сень", "осень"],
-    };
-    const suffix = word.slice(-2);
-    const suffix3 = word.slice(-3);
-    setRhymeWords(endings[suffix3] || endings[suffix] || ["ночь", "дочь", "мочь", "рочь"]);
+    const r = await generate("rhymes", { word });
+    if (r?.json) setRhymeWords(r.json as string[]);
+  };
+
+  const writePoem = async () => {
+    const r = await generate("poem-write", {
+      form: selectedForm.label, title: poemTitle, mood, meter, rhyme, theme: poemTitle,
+    });
+    if (r?.text) {
+      setVerses(v => v.map(x => x.id === activeVerse ? { ...x, text: r.text } : x));
+    }
+  };
+
+  const continuePoem = async () => {
+    const v = verses.find(x => x.id === activeVerse);
+    if (!v) return;
+    const r = await generate("poem-continue", { mood, rhyme, existingText: v.text });
+    if (r?.text) {
+      setVerses(vs => vs.map(x => x.id === activeVerse
+        ? { ...x, text: x.text ? `${x.text}\n${r.text}` : r.text }
+        : x));
+    }
   };
 
   const exportPoem = () => {
@@ -72,6 +95,54 @@ export function PoemScreen({ setScreen }: Props) {
     a.href = URL.createObjectURL(blob);
     a.download = `${poemTitle || "poem"}.txt`;
     a.click();
+  };
+
+  const handleSave = async () => {
+    const id = await save(
+      projectId,
+      poemTitle || "Без названия",
+      { form, mood, meter, rhyme, poemTitle, verses },
+      fullText.split("\n").slice(0, 4).join("\n"),
+    );
+    if (id) setProjectId(id);
+  };
+
+  const openDrawer = async () => {
+    setDrawerOpen(true);
+    setLoadingProjects(true);
+    setSavedProjects(await list());
+    setLoadingProjects(false);
+  };
+
+  const handleLoadProject = async (id: string) => {
+    const proj = await load(id);
+    if (proj?.data) {
+      const d = proj.data as {
+        form?: string; mood?: string; meter?: string; rhyme?: string;
+        poemTitle?: string; verses?: Verse[];
+      };
+      setForm(d.form || "free");
+      setMood(d.mood || "Лирика");
+      setMeter(d.meter || "Ямб");
+      setRhyme(d.rhyme || "ABAB");
+      setPoemTitle(d.poemTitle || "");
+      if (d.verses && d.verses.length) {
+        setVerses(d.verses);
+        setActiveVerse(d.verses[0].id);
+      }
+      setProjectId(proj.id);
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (await remove(id)) {
+      setSavedProjects(p => p.filter(x => x.id !== id));
+      if (id === projectId) setProjectId(null);
+    }
+  };
+
+  const voicePoem = async () => {
+    await voice(fullText, poemTitle || "Стихотворение", "jane", 0.9);
   };
 
   const currentVerse = verses.find(v => v.id === activeVerse);
@@ -96,13 +167,26 @@ export function PoemScreen({ setScreen }: Props) {
             {selectedForm.label} · {mood} · {wordCount} слов
           </div>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2 items-center justify-end">
+          <AIButton
+            onClick={writePoem}
+            loading={aiLoading && loadingTask === "poem-write"}
+            label="Сочинить стих ИИ"
+            color={AB_COLOR}
+            size="sm"
+          />
           <button onClick={() => setShowHelper(v => !v)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
             style={showHelper
               ? { background: "rgba(236,72,153,0.15)", color: "#ec4899", border: "1px solid rgba(236,72,153,0.4)" }
               : { background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
             <Icon name="Sparkles" fallback="Star" size={13} />Рифмовник
+          </button>
+          <SaveStatus saving={saving} savedAt={savedAt} onSave={handleSave} color={AB_COLOR} />
+          <button onClick={openDrawer}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>
+            <Icon name="FolderOpen" size={13} />Мои стихи
           </button>
           <button onClick={exportPoem} disabled={!fullText.trim()}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40"
@@ -223,6 +307,16 @@ export function PoemScreen({ setScreen }: Props) {
                 className="w-full px-5 py-4 min-h-[280px] bg-transparent focus:outline-none text-base leading-loose resize-none"
                 style={{ color: "var(--ab-text-primary)", fontFamily: "'IBM Plex Mono', monospace" }}
               />
+              <div className="px-4 py-3 flex justify-start" style={{ borderTop: "1px solid var(--ab-border)" }}>
+                <AIButton
+                  onClick={continuePoem}
+                  loading={aiLoading && loadingTask === "poem-continue"}
+                  label="Продолжить ИИ"
+                  color={AB_COLOR}
+                  size="sm"
+                  variant="ghost"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -240,9 +334,13 @@ export function PoemScreen({ setScreen }: Props) {
                   placeholder="Введи слово…"
                   className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
                   style={{ background: "var(--ab-page-bg)", border: "1px solid var(--ab-border)", color: "var(--ab-text-primary)" }} />
-                <button onClick={findRhymes}
-                  className="px-3 py-2 rounded-lg text-white text-xs font-medium"
-                  style={{ background: "#ec4899" }}>→</button>
+                <button onClick={findRhymes} disabled={aiLoading && loadingTask === "rhymes"}
+                  className="px-3 py-2 rounded-lg text-white text-xs font-medium flex items-center justify-center disabled:opacity-60"
+                  style={{ background: "#ec4899" }}>
+                  {aiLoading && loadingTask === "rhymes"
+                    ? <Icon name="Loader2" size={14} className="animate-spin" />
+                    : "→"}
+                </button>
               </div>
               {rhymeWords.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -263,15 +361,50 @@ export function PoemScreen({ setScreen }: Props) {
           )}
 
           {/* Full preview */}
-          <div className="rounded-2xl p-4 flex-1" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-            <div className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: "var(--ab-text-secondary)" }}>Полный текст</div>
+          <div className="rounded-2xl p-4 flex-1 flex flex-col" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ab-text-secondary)" }}>Полный текст</div>
+              <AIButton
+                onClick={voicePoem}
+                loading={voicing}
+                label="Озвучить стих"
+                color={AB_COLOR}
+                size="sm"
+                variant="ghost"
+                disabled={!fullText.trim()}
+              />
+            </div>
             <pre className="text-xs leading-relaxed whitespace-pre-wrap font-ibm"
               style={{ color: "var(--ab-text-secondary)", minHeight: "200px" }}>
               {fullText || "Начни писать…"}
             </pre>
+            {audioUrl && (
+              <div className="mt-3">
+                <MiniPlayer
+                  url={audioUrl}
+                  title={poemTitle || "Стихотворение"}
+                  color={AB_COLOR}
+                  onClose={() => setAudioUrl("")}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <ErrorToast
+        message={aiError || ttsError}
+        onClose={() => { setAiError(""); setTtsError(""); }}
+      />
+      <ProjectsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projects={savedProjects}
+        loading={loadingProjects}
+        color={AB_COLOR}
+        onLoad={handleLoadProject}
+        onDelete={handleDeleteProject}
+      />
     </div>
   );
 }
