@@ -6,6 +6,7 @@ import { SaveStatus, ErrorToast, ProjectsDrawer } from "@/components/audiobook/E
 import { AvatarLookStep } from "@/components/audiobook/AvatarLookStep";
 import { AvatarScriptsStep } from "@/components/audiobook/AvatarScriptsStep";
 import { AvatarChatStep } from "@/components/audiobook/AvatarChatStep";
+import { downloadAvatarCard } from "@/components/audiobook/avatar-export";
 
 interface Props { setScreen: (s: Screen) => void; }
 
@@ -124,6 +125,15 @@ export function AvatarScreen({ setScreen }: Props) {
     setLoadingProjects(false);
   };
 
+  const canExport = Boolean(persona || pitch || faq.length);
+
+  const handleExport = () => {
+    downloadAvatarCard({
+      persona, pitch, faq, avatarUrl, industry, product, toneLabel,
+      voiceName: VOICES.find(v => v.id === voiceId)?.name || voiceId,
+    });
+  };
+
   const handleLoad = async (id: string) => {
     const p = await load(id);
     if (p?.data) {
@@ -180,6 +190,13 @@ export function AvatarScreen({ setScreen }: Props) {
             style={{ color: "var(--ab-text-secondary)" }}>
             <Icon name="FolderOpen" size={14} /><span className="hidden sm:inline">Мои аватары</span>
           </button>
+          {canExport && (
+            <button onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+              style={{ background: `${AB_COLOR}12`, color: AB_COLOR, border: `1px solid ${AB_COLOR}30` }}>
+              <Icon name="Download" size={14} /><span className="hidden sm:inline">Скачать карточку</span>
+            </button>
+          )}
           <SaveStatus saving={saving} savedAt={savedAt} onSave={handleSave} color={AB_COLOR} />
         </div>
       </div>
