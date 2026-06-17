@@ -2,6 +2,7 @@ export const TTS_URL = "https://functions.poehali.dev/ce35a220-1add-443c-976f-14
 export const PARSE_URL = "https://functions.poehali.dev/6eb61321-5f6e-40f3-b5ba-2e1a9fe7dfcc";
 export const AI_URL = "https://functions.poehali.dev/506071b5-d529-4a0c-ac9e-0cb08f237591";
 export const PROJECTS_URL = "https://functions.poehali.dev/5c7ea0e4-5ee6-49b1-832d-eeb32b0d2e12";
+export const AVATAR_IMAGE_URL = "https://functions.poehali.dev/10b30453-91c3-4642-bd76-b661eb5057be";
 export const SUPPORTED_EXTS = ["txt", "pdf", "epub", "docx"];
 
 export const AI_MODELS = [
@@ -180,7 +181,8 @@ export type Screen =
   | "book-writer"
   | "animation"
   | "podcast"
-  | "poem";
+  | "poem"
+  | "avatar";
 
 export interface CreativeModule {
   id: Screen;
@@ -238,6 +240,29 @@ export const CREATIVE_MODULES: CreativeModule[] = [
     tagline: "Чувство → Текст",
     desc: "Пиши стихи, рифмуй строфы, создавай тексты песен с подсказками",
   },
+  {
+    id: "avatar",
+    label: "Аватар-продавец",
+    icon: "UserRound",
+    color: "#06b6d4",
+    gradient: "from-cyan-400 to-blue-600",
+    tagline: "Идея → Виртуальный менеджер",
+    desc: "Создай виртуального продавца: внешность, голос, скрипты продаж и ответы клиентам",
+  },
+];
+
+export const AVATAR_TONES = [
+  { id: "friendly",   label: "Дружелюбный",  emoji: "😊", desc: "Тёплый, располагающий" },
+  { id: "expert",     label: "Эксперт",      emoji: "🎓", desc: "Уверенный профессионал" },
+  { id: "energetic",  label: "Энергичный",   emoji: "⚡", desc: "Драйвовый, мотивирующий" },
+  { id: "premium",    label: "Премиальный",  emoji: "💎", desc: "Сдержанный, статусный" },
+  { id: "caring",     label: "Заботливый",   emoji: "🤝", desc: "Внимательный к клиенту" },
+];
+
+export const AVATAR_INDUSTRIES = [
+  "Недвижимость", "Автомобили", "Бьюти и косметика", "Финансы и банки",
+  "Образование", "Медицина", "Одежда и мода", "Электроника",
+  "Туризм", "Рестораны", "Фитнес", "IT и софт",
 ];
 
 export interface Project {

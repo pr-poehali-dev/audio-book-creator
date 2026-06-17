@@ -69,6 +69,24 @@ SYSTEM_PROMPTS = {
         "Отвечай СТРОГО валидным JSON-массивом строк без markdown, например: "
         '["слово1", "слово2", "слово3"]'
     ),
+    "avatar": (
+        "Ты — эксперт по продажам и созданию виртуальных консультантов. "
+        "Создаёшь живые, убедительные и человечные скрипты для аватаров-продавцов. "
+        "Пишешь естественной разговорной речью, без канцелярита. "
+        "Понимаешь психологию клиента, работу с возражениями и техники продаж. "
+        "Не используй markdown."
+    ),
+    "avatar-json": (
+        "Ты — эксперт по продажам и созданию виртуальных консультантов. "
+        "Помогаешь спроектировать виртуального продавца: внешность, характер, "
+        "приветствие и реплики. Отвечай СТРОГО валидным JSON без markdown."
+    ),
+    "avatar-image": (
+        "You are an expert prompt engineer for photorealistic portrait image "
+        "generation (FLUX/Midjourney style). You write detailed English prompts "
+        "for professional, friendly, trustworthy sales consultant portraits. "
+        "Answer with ONLY the prompt text, no markdown, no explanations."
+    ),
 }
 
 
@@ -214,6 +232,86 @@ def _build_messages(task: str, payload: dict) -> tuple[list, dict]:
         extra["json_mode"] = True
         extra["max_tokens"] = 300
         extra["temperature"] = 0.7
+
+    # ─── Аватар-продавец ──────────────────────────────────────────────────
+    elif task == "avatar-image-prompt":
+        system = SYSTEM_PROMPTS["avatar-image"]
+        user = (
+            "Generate a detailed English image-generation prompt for a photorealistic "
+            "portrait of a virtual sales consultant.\n"
+            f"Gender: {payload.get('gender', 'any')}.\n"
+            f"Appearance description (translate to English if needed): {payload.get('appearance', '')}.\n"
+            f"Industry/role: {payload.get('industry', 'sales')}.\n"
+            f"Style: {payload.get('style', 'professional, friendly')}.\n"
+            "Requirements: head-and-shoulders portrait, looking at camera, warm genuine smile, "
+            "clean studio background, soft professional lighting, business attire, high detail, 8k, "
+            "trustworthy and approachable. Output ONLY the prompt."
+        )
+        extra["max_tokens"] = 400
+        extra["temperature"] = 0.8
+
+    elif task == "avatar-persona":
+        system = SYSTEM_PROMPTS["avatar-json"]
+        user = (
+            "Спроектируй личность виртуального продавца для бизнеса.\n"
+            f"Имя (если не задано — придумай): {payload.get('name', '')}.\n"
+            f"Компания/продукт: {payload.get('product', '')}.\n"
+            f"Сфера: {payload.get('industry', '')}.\n"
+            f"Тон общения: {payload.get('tone', 'дружелюбный профессионал')}.\n\n"
+            'Верни JSON: {"name": "имя", "role": "должность", '
+            '"personality": "описание характера 1-2 предложения", '
+            '"greeting": "приветственная фраза клиенту", '
+            '"strengths": ["сильная сторона 1", "сильная сторона 2", "сильная сторона 3"]}. '
+            "Только JSON."
+        )
+        extra["json_mode"] = True
+        extra["temperature"] = 0.9
+
+    elif task == "avatar-pitch":
+        system = SYSTEM_PROMPTS["avatar"]
+        user = (
+            f"Напиши продающий монолог (питч) от лица продавца {payload.get('name', 'консультанта')}.\n"
+            f"Компания/продукт: {payload.get('product', '')}.\n"
+            f"Сфера: {payload.get('industry', '')}.\n"
+            f"Тон: {payload.get('tone', 'дружелюбный профессионал')}.\n"
+            f"Целевая аудитория: {payload.get('audience', 'клиенты')}.\n"
+            f"Длительность: {payload.get('length', 'средняя')} "
+            "(короткая ~40 слов, средняя ~90 слов, длинная ~150 слов).\n\n"
+            "Питч должен цеплять с первой фразы, показывать выгоду и завершаться "
+            "призывом к действию. Пиши живой разговорной речью для озвучки. "
+            "Только текст монолога."
+        )
+        extra["temperature"] = 0.9
+        extra["max_tokens"] = 800
+
+    elif task == "avatar-faq":
+        system = SYSTEM_PROMPTS["avatar-json"]
+        user = (
+            f"Продавец {payload.get('name', 'консультант')} для «{payload.get('product', '')}» "
+            f"(сфера: {payload.get('industry', '')}, тон: {payload.get('tone', 'дружелюбный')}).\n\n"
+            "Составь 6 частых вопросов клиентов с убедительными ответами от лица продавца, "
+            "включая работу с типичными возражениями (цена, сомнения, сравнение). "
+            'Верни JSON-массив: [{"question": "вопрос клиента", "answer": "ответ продавца"}]. '
+            "Только JSON."
+        )
+        extra["json_mode"] = True
+        extra["max_tokens"] = 2500
+        extra["temperature"] = 0.85
+
+    elif task == "avatar-reply":
+        system = SYSTEM_PROMPTS["avatar"]
+        user = (
+            f"Ты — виртуальный продавец {payload.get('name', 'консультант')}.\n"
+            f"Продукт/компания: {payload.get('product', '')}.\n"
+            f"Сфера: {payload.get('industry', '')}.\n"
+            f"Твой характер: {payload.get('personality', 'дружелюбный профессионал')}.\n"
+            f"Тон: {payload.get('tone', 'дружелюбный')}.\n\n"
+            f"Клиент написал: «{payload.get('message', '')}»\n\n"
+            "Ответь как живой продавец — кратко, по делу, тепло, веди к продаже. "
+            "Только текст ответа, без префиксов."
+        )
+        extra["temperature"] = 0.85
+        extra["max_tokens"] = 600
 
     else:
         return [], extra

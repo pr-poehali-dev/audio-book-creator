@@ -11,6 +11,7 @@ import { BookWriterScreen } from "@/components/audiobook/BookWriterScreen";
 import { AnimationScreen }  from "@/components/audiobook/AnimationScreen";
 import { PodcastScreen }    from "@/components/audiobook/PodcastScreen";
 import { PoemScreen }       from "@/components/audiobook/PoemScreen";
+import { AvatarScreen }     from "@/components/audiobook/AvatarScreen";
 
 type Theme = "light" | "dark";
 
@@ -29,7 +30,7 @@ function useTheme() {
   return { theme, toggle: () => setTheme(t => t === "light" ? "dark" : "light") };
 }
 
-const NAV_MODULES: Screen[] = ["editor", "book-writer", "animation", "podcast", "poem"];
+const NAV_MODULES: Screen[] = ["editor", "book-writer", "animation", "podcast", "poem", "avatar"];
 
 export default function App() {
   const { theme, toggle: toggleTheme } = useTheme();
@@ -305,6 +306,7 @@ export default function App() {
         {screen === "animation"    && <AnimationScreen  setScreen={setScreen} />}
         {screen === "podcast"      && <PodcastScreen    setScreen={setScreen} />}
         {screen === "poem"         && <PoemScreen       setScreen={setScreen} />}
+        {screen === "avatar"       && <AvatarScreen     setScreen={setScreen} />}
       </div>
     </div>
   );

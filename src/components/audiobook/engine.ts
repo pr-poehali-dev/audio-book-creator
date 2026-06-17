@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
-import { AI_URL, PROJECTS_URL, TTS_URL, USER_ID } from "@/components/audiobook/audiobook-data";
+import { AI_URL, PROJECTS_URL, TTS_URL, AVATAR_IMAGE_URL, USER_ID } from "@/components/audiobook/audiobook-data";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ДВИЖОК ТВОРЧЕСКИХ МОДУЛЕЙ
-   useAI    — генерация текста через Polza.ai
-   useSave  — сохранение/загрузка проектов в БД
-   useTTS   — озвучка любого текста в MP3
+   useAI       — генерация текста через Polza.ai
+   useSave     — сохранение/загрузка проектов в БД
+   useTTS      — озвучка любого текста в MP3
+   useAvatarImage — генерация изображения аватара
    ───────────────────────────────────────────────────────────────────────────── */
 
 interface AIResult {
@@ -158,4 +159,39 @@ export function useTTS() {
   );
 
   return { voice, voicing, audioUrl, setAudioUrl, error, setError };
+}
+
+/* ─── Генерация изображения аватара ────────────────────────────────────────── */
+
+export function useAvatarImage() {
+  const [generating, setGenerating] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [error, setError] = useState("");
+
+  const generateImage = useCallback(async (prompt: string): Promise<string | null> => {
+    if (!prompt.trim()) {
+      setError("Нужно описание внешности");
+      return null;
+    }
+    setGenerating(true);
+    setError("");
+    try {
+      const res = await fetch(AVATAR_IMAGE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Ошибка генерации");
+      setImageUrl(data.image_url);
+      return data.image_url as string;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Не удалось создать аватар");
+      return null;
+    } finally {
+      setGenerating(false);
+    }
+  }, []);
+
+  return { generateImage, generating, imageUrl, setImageUrl, error, setError };
 }
