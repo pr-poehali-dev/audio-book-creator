@@ -20,7 +20,17 @@ export interface Persona {
   strengths: string[];
 }
 export interface FaqItem { question: string; answer: string; }
-export interface ChatMsg { from: "client" | "avatar"; text: string; }
+export interface ChatMsg { from: "client" | "avatar"; text: string; audioUrl?: string }
+export interface LeadAnalysis {
+  score: number;
+  temperature: string;
+  summary: string;
+  interests: string[];
+  objections: string[];
+  name: string;
+  contact: string;
+  next_step: string;
+}
 
 export function AvatarScreen({ setScreen }: Props) {
   const [step, setStep] = useState<"look" | "scripts" | "chat">("look");
@@ -33,6 +43,8 @@ export function AvatarScreen({ setScreen }: Props) {
   const [tone, setTone] = useState("friendly");
   const [voiceId, setVoiceId] = useState("alena");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarVariants, setAvatarVariants] = useState<string[]>([]);
+  const [knowledge, setKnowledge] = useState("");
 
   // ── Сгенерированный контент ───────────────────────────────────────────────
   const [persona, setPersona] = useState<Persona | null>(null);
@@ -40,9 +52,14 @@ export function AvatarScreen({ setScreen }: Props) {
   const [faq, setFaq] = useState<FaqItem[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
 
+  // ── Усиления ──────────────────────────────────────────────────────────────
+  const [autoVoice, setAutoVoice] = useState(true);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [lead, setLead] = useState<LeadAnalysis | null>(null);
+
   // ── Движок ────────────────────────────────────────────────────────────────
   const { generate, loading, loadingTask, error: aiError, setError: setAiError } = useAI("openai/gpt-4o-mini");
-  const { generateImage, generating, error: imgError, setError: setImgError } = useAvatarImage();
+  const { generateImage, generateVariants, generating, error: imgError, setError: setImgError } = useAvatarImage();
   const { save, list, load, remove, saving, savedAt } = useSave("avatar");
   const { voice, voicing, audioUrl, setAudioUrl, error: ttsError, setError: setTtsError } = useTTS();
 
@@ -53,15 +70,33 @@ export function AvatarScreen({ setScreen }: Props) {
 
   const toneLabel = AVATAR_TONES.find(t => t.id === tone)?.label || "дружелюбный";
 
-  // ── Генерация внешности ───────────────────────────────────────────────────
+  // ── Генерация внешности (несколько вариантов) ─────────────────────────────
   const genAvatar = async () => {
     const r = await generate("avatar-image-prompt", {
       gender: gender === "Женский" ? "female" : "male",
       appearance, industry, style: toneLabel,
     });
     if (r?.text) {
+      const urls = await generateVariants(r.text, 3);
+      if (urls.length) {
+        setAvatarVariants(urls);
+        if (!avatarUrl) setAvatarUrl(urls[0]);
+      }
+    }
+  };
+
+  // одиночная генерация (для совместимости / докрутки)
+  const genAvatarOne = async () => {
+    const r = await generate("avatar-image-prompt", {
+      gender: gender === "Женский" ? "female" : "male",
+      appearance, industry, style: toneLabel,
+    });
+    if (r?.text) {
       const url = await generateImage(r.text);
-      if (url) setAvatarUrl(url);
+      if (url) {
+        setAvatarUrl(url);
+        setAvatarVariants(v => [url, ...v].slice(0, 6));
+      }
     }
   };
 
@@ -97,12 +132,35 @@ export function AvatarScreen({ setScreen }: Props) {
   // ── Чат-симулятор ─────────────────────────────────────────────────────────
   const sendMessage = async (message: string) => {
     if (!message.trim()) return;
+    const history = [...chat];
     setChat(c => [...c, { from: "client", text: message }]);
     const r = await generate("avatar-reply", {
       name: persona?.name || "Консультант", product, industry,
       personality: persona?.personality || "", tone: toneLabel, message,
+      knowledge, history,
     });
-    if (r?.text) setChat(c => [...c, { from: "avatar", text: r.text }]);
+    if (r?.text) {
+      const replyText = r.text;
+      let replyAudio = "";
+      if (autoVoice) {
+        const url = await voice(replyText, `${persona?.name || "Аватар"} — ответ`, voiceId, 1.0);
+        if (url) replyAudio = url;
+      }
+      setChat(c => {
+        const next = [...c, { from: "avatar" as const, text: replyText, audioUrl: replyAudio }];
+        if (replyAudio) {
+          const idx = next.length - 1;
+          setSpeakingIdx(idx);
+        }
+        return next;
+      });
+    }
+  };
+
+  // ── Анализ лида ───────────────────────────────────────────────────────────
+  const analyzeLead = async () => {
+    const r = await generate("avatar-analyze", { product, history: chat });
+    if (r?.obj && Object.keys(r.obj).length) setLead(r.obj as unknown as LeadAnalysis);
   };
 
   // ── Озвучка ───────────────────────────────────────────────────────────────
@@ -112,7 +170,7 @@ export function AvatarScreen({ setScreen }: Props) {
 
   // ── Сохранение / загрузка ─────────────────────────────────────────────────
   const handleSave = async () => {
-    const data = { gender, appearance, industry, product, tone, voiceId, avatarUrl, persona, pitch, faq };
+    const data = { gender, appearance, industry, product, tone, voiceId, avatarUrl, avatarVariants, knowledge, persona, pitch, faq };
     const preview = (persona?.role || product || appearance).slice(0, 200);
     const id = await save(projectId, persona?.name || product || "Аватар-продавец", data, preview);
     if (id) setProjectId(id);
@@ -140,6 +198,7 @@ export function AvatarScreen({ setScreen }: Props) {
       const d = p.data as {
         gender: "Женский" | "Мужской"; appearance: string; industry: string;
         product: string; tone: string; voiceId: string; avatarUrl: string;
+        avatarVariants?: string[]; knowledge?: string;
         persona: Persona | null; pitch: string; faq: FaqItem[];
       };
       setGender(d.gender || "Женский");
@@ -149,6 +208,8 @@ export function AvatarScreen({ setScreen }: Props) {
       setTone(d.tone || "friendly");
       setVoiceId(d.voiceId || "alena");
       setAvatarUrl(d.avatarUrl || "");
+      setAvatarVariants(d.avatarVariants || []);
+      setKnowledge(d.knowledge || "");
       setPersona(d.persona || null);
       setPitch(d.pitch || "");
       setFaq(d.faq || []);
@@ -230,11 +291,14 @@ export function AvatarScreen({ setScreen }: Props) {
           appearance={appearance} setAppearance={setAppearance}
           industry={industry} setIndustry={setIndustry}
           product={product} setProduct={setProduct}
+          knowledge={knowledge} setKnowledge={setKnowledge}
           tone={tone} setTone={setTone}
           voiceId={voiceId} setVoiceId={setVoiceId}
-          avatarUrl={avatarUrl}
+          avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
+          avatarVariants={avatarVariants}
           generating={generating}
           genAvatar={genAvatar}
+          genAvatarOne={genAvatarOne}
           industries={AVATAR_INDUSTRIES}
           tones={AVATAR_TONES}
           voices={VOICES}
@@ -263,6 +327,10 @@ export function AvatarScreen({ setScreen }: Props) {
           voicing={voicing} audioUrl={audioUrl} setAudioUrl={setAudioUrl}
           sendMessage={sendMessage} voiceText={voiceText}
           avatarUrl={avatarUrl}
+          autoVoice={autoVoice} setAutoVoice={setAutoVoice}
+          speakingIdx={speakingIdx} setSpeakingIdx={setSpeakingIdx}
+          lead={lead} analyzeLead={analyzeLead}
+          hasKnowledge={Boolean(knowledge.trim())}
           color={AB_COLOR}
         />
       )}

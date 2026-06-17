@@ -15,13 +15,18 @@ interface Props {
   setIndustry: (v: string) => void;
   product: string;
   setProduct: (v: string) => void;
+  knowledge: string;
+  setKnowledge: (v: string) => void;
   tone: string;
   setTone: (v: string) => void;
   voiceId: string;
   setVoiceId: (v: string) => void;
   avatarUrl: string;
+  setAvatarUrl: (v: string) => void;
+  avatarVariants: string[];
   generating: boolean;
   genAvatar: () => void;
+  genAvatarOne: () => void;
   industries: string[];
   tones: Tone[];
   voices: VoiceItem[];
@@ -31,8 +36,9 @@ interface Props {
 
 export function AvatarLookStep({
   gender, setGender, appearance, setAppearance, industry, setIndustry,
-  product, setProduct, tone, setTone, voiceId, setVoiceId, avatarUrl,
-  generating, genAvatar, industries, tones, voices, color, setStep,
+  product, setProduct, knowledge, setKnowledge, tone, setTone, voiceId, setVoiceId,
+  avatarUrl, setAvatarUrl, avatarVariants, generating, genAvatar, genAvatarOne,
+  industries, tones, voices, color, setStep,
 }: Props) {
   const filteredVoices = voices.filter(v => v.gender === gender);
 
@@ -62,9 +68,27 @@ export function AvatarLookStep({
               )}
             </div>
           )}
-          <AIButton color={color} loading={generating}
-            label={avatarUrl ? "Сгенерировать заново" : "Создать лицо ИИ"}
-            onClick={genAvatar} disabled={!appearance.trim()} />
+          {/* Галерея вариантов лиц */}
+          {avatarVariants.length > 1 && (
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {avatarVariants.map((url, i) => (
+                <button key={i} onClick={() => setAvatarUrl(url)}
+                  className="w-14 h-14 rounded-xl overflow-hidden transition-all"
+                  style={{ border: avatarUrl === url ? `3px solid ${color}` : "2px solid var(--ab-border)" }}>
+                  <img src={url} alt={`Вариант ${i + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <AIButton color={color} loading={generating}
+              label={avatarVariants.length ? "3 новых варианта" : "Создать 3 лица ИИ"}
+              onClick={genAvatar} disabled={!appearance.trim()} />
+            {avatarVariants.length > 0 && (
+              <AIButton color={color} variant="ghost" size="sm" loading={generating}
+                label="+1" onClick={genAvatarOne} disabled={!appearance.trim()} />
+            )}
+          </div>
         </div>
 
         {/* Правая колонка — настройки внешности */}
@@ -120,6 +144,29 @@ export function AvatarLookStep({
             style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
             onFocus={e => (e.currentTarget.style.borderColor = color)}
             onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium flex items-center gap-1.5" style={{ color: "var(--ab-text-secondary)" }}>
+              <Icon name="BookText" fallback="FileText" size={14} style={{ color } as React.CSSProperties} />
+              База знаний о товаре
+            </label>
+            {knowledge.trim() && (
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>
+                {knowledge.trim().length} симв.
+              </span>
+            )}
+          </div>
+          <textarea value={knowledge} onChange={e => setKnowledge(e.target.value)}
+            placeholder="Вставь прайс, характеристики, условия, акции, гарантии… Аватар будет отвечать клиентам строго по этим данным — без выдумок."
+            rows={5}
+            className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all resize-none"
+            style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
+            onFocus={e => (e.currentTarget.style.borderColor = color)}
+            onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
+          <div className="text-xs mt-1.5" style={{ color: "var(--ab-text-secondary)" }}>
+            💡 Чем подробнее — тем точнее аватар отвечает на вопросы клиентов
+          </div>
         </div>
       </div>
 

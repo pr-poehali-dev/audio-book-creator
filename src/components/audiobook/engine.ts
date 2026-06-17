@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { AI_URL, PROJECTS_URL, TTS_URL, AVATAR_IMAGE_URL, USER_ID } from "@/components/audiobook/audiobook-data";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -12,6 +12,7 @@ import { AI_URL, PROJECTS_URL, TTS_URL, AVATAR_IMAGE_URL, USER_ID } from "@/comp
 interface AIResult {
   text: string;
   json: unknown[];
+  obj: Record<string, unknown>;
 }
 
 export function useAI(model = "openai/gpt-4o-mini") {
@@ -34,7 +35,7 @@ export function useAI(model = "openai/gpt-4o-mini") {
         if (!res.ok || !data.success) {
           throw new Error(data.error || "Ошибка генерации");
         }
-        return { text: data.text || "", json: data.json || [] };
+        return { text: data.text || "", json: data.json || [], obj: data.obj || {} };
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Не удалось сгенерировать");
         return null;
@@ -193,5 +194,82 @@ export function useAvatarImage() {
     }
   }, []);
 
-  return { generateImage, generating, imageUrl, setImageUrl, error, setError };
+  const generateVariants = useCallback(async (prompt: string, count = 3): Promise<string[]> => {
+    if (!prompt.trim()) {
+      setError("Нужно описание внешности");
+      return [];
+    }
+    setGenerating(true);
+    setError("");
+    try {
+      const requests = Array.from({ length: count }, () =>
+        fetch(AVATAR_IMAGE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        }).then(r => r.json()),
+      );
+      const results = await Promise.all(requests);
+      const urls = results
+        .filter(d => d.success && d.image_url)
+        .map(d => d.image_url as string);
+      if (!urls.length) throw new Error("Не удалось создать варианты");
+      return urls;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Не удалось создать варианты");
+      return [];
+    } finally {
+      setGenerating(false);
+    }
+  }, []);
+
+  return { generateImage, generateVariants, generating, imageUrl, setImageUrl, error, setError };
+}
+
+/* ─── Распознавание речи (голосовой ввод) ──────────────────────────────────── */
+
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: { results: { 0: { 0: { transcript: string } } } }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+}
+
+export function useSpeechInput(onResult: (text: string) => void) {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const supported = typeof window !== "undefined" &&
+    Boolean((window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
+
+  const toggle = useCallback(() => {
+    if (!supported) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const W = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+    const Ctor = W.SpeechRecognition || W.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const rec = new Ctor();
+    rec.lang = "ru-RU";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      onResult(transcript);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  }, [supported, listening, onResult]);
+
+  return { listening, toggle, supported };
 }

@@ -300,18 +300,61 @@ def _build_messages(task: str, payload: dict) -> tuple[list, dict]:
 
     elif task == "avatar-reply":
         system = SYSTEM_PROMPTS["avatar"]
+        knowledge = (payload.get("knowledge") or "").strip()
+        history = payload.get("history") or []
         user = (
             f"Ты — виртуальный продавец {payload.get('name', 'консультант')}.\n"
             f"Продукт/компания: {payload.get('product', '')}.\n"
             f"Сфера: {payload.get('industry', '')}.\n"
             f"Твой характер: {payload.get('personality', 'дружелюбный профессионал')}.\n"
             f"Тон: {payload.get('tone', 'дружелюбный')}.\n\n"
+        )
+        if knowledge:
+            user += (
+                "БАЗА ЗНАНИЙ О ТОВАРЕ (отвечай строго по ней, не выдумывай факты, "
+                "цены и условия бери только отсюда):\n"
+                f"\"\"\"\n{knowledge[:6000]}\n\"\"\"\n\n"
+            )
+        if history:
+            hist_lines = []
+            for h in history[-8:]:
+                role = "Клиент" if h.get("from") == "client" else "Ты"
+                hist_lines.append(f"{role}: {h.get('text', '')}")
+            user += "История диалога:\n" + "\n".join(hist_lines) + "\n\n"
+        user += (
             f"Клиент написал: «{payload.get('message', '')}»\n\n"
             "Ответь как живой продавец — кратко, по делу, тепло, веди к продаже. "
-            "Только текст ответа, без префиксов."
+            "Если уместно — мягко предложи оставить контакт (имя, телефон) для "
+            "персонального предложения. Только текст ответа, без префиксов."
         )
         extra["temperature"] = 0.85
         extra["max_tokens"] = 600
+
+    elif task == "avatar-analyze":
+        system = SYSTEM_PROMPTS["avatar-json"]
+        history = payload.get("history") or []
+        hist_lines = []
+        for h in history:
+            role = "Клиент" if h.get("from") == "client" else "Продавец"
+            hist_lines.append(f"{role}: {h.get('text', '')}")
+        dialog = "\n".join(hist_lines) if hist_lines else "(диалог пуст)"
+        user = (
+            f"Проанализируй диалог продавца с клиентом по продукту «{payload.get('product', '')}».\n\n"
+            f"Диалог:\n{dialog}\n\n"
+            "Оцени клиента как лида. Верни JSON:\n"
+            '{"score": число 0-100 (готовность к покупке), '
+            '"temperature": "холодный|тёплый|горячий", '
+            '"summary": "краткий вывод о клиенте 1-2 предложения", '
+            '"interests": ["что интересует клиента"], '
+            '"objections": ["возражения и сомнения клиента"], '
+            '"name": "имя клиента если упомянул, иначе пустая строка", '
+            '"contact": "телефон/email если оставил, иначе пустая строка", '
+            '"next_step": "рекомендация продавцу — что делать дальше"}. '
+            "Только JSON."
+        )
+        extra["json_mode"] = True
+        extra["max_tokens"] = 800
+        extra["temperature"] = 0.4
 
     else:
         return [], extra
@@ -393,10 +436,27 @@ def handler(event: dict, context: Any) -> dict:
     result = {"success": True, "text": content}
 
     if extra["json_mode"]:
-        parsed = _try_parse_json(content)
-        result["json"] = parsed
+        result["json"] = _try_parse_json(content)
+        result["obj"] = _try_parse_object(content)
 
     return _response(200, result)
+
+
+def _try_parse_object(content: str):
+    """Возвращает распарсенный JSON-объект (dict) либо пустой dict."""
+    content = content.strip()
+    if content.startswith("```"):
+        parts = content.split("```")
+        if len(parts) > 1:
+            content = parts[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip()
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _try_parse_json(content: str):
