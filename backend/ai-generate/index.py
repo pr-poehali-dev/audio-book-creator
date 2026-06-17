@@ -82,9 +82,11 @@ SYSTEM_PROMPTS = {
         "приветствие и реплики. Отвечай СТРОГО валидным JSON без markdown."
     ),
     "avatar-image": (
-        "You are an expert prompt engineer for photorealistic portrait image "
-        "generation (FLUX/Midjourney style). You write detailed English prompts "
-        "for professional, friendly, trustworthy sales consultant portraits. "
+        "You are a world-class prompt engineer specializing in HYPER-PHOTOREALISTIC "
+        "human portrait photography prompts for FLUX. Your prompts always produce images "
+        "indistinguishable from a real DSLR photograph of a real person — never 3D, "
+        "never CGI, never illustration. You emphasize camera/lens specs, natural lighting, "
+        "realistic skin texture and lifelike imperfections. "
         "Answer with ONLY the prompt text, no markdown, no explanations."
     ),
 }
@@ -237,18 +239,29 @@ def _build_messages(task: str, payload: dict) -> tuple[list, dict]:
     elif task == "avatar-image-prompt":
         system = SYSTEM_PROMPTS["avatar-image"]
         user = (
-            "Generate a detailed English image-generation prompt for a photorealistic "
-            "portrait of a virtual sales consultant.\n"
+            "Write ONE detailed English prompt for a HYPER-PHOTOREALISTIC portrait "
+            "of a real human sales consultant. The result must look like an actual "
+            "photograph of a real person, NOT a render, NOT 3D, NOT CGI, NOT an illustration.\n\n"
             f"Gender: {payload.get('gender', 'any')}.\n"
-            f"Appearance description (translate to English if needed): {payload.get('appearance', '')}.\n"
+            f"Appearance (translate to English if needed): {payload.get('appearance', '')}.\n"
             f"Industry/role: {payload.get('industry', 'sales')}.\n"
-            f"Style: {payload.get('style', 'professional, friendly')}.\n"
-            "Requirements: head-and-shoulders portrait, looking at camera, warm genuine smile, "
-            "clean studio background, soft professional lighting, business attire, high detail, 8k, "
-            "trustworthy and approachable. Output ONLY the prompt."
+            f"Mood/style: {payload.get('style', 'professional, friendly')}.\n\n"
+            "MUST include these photographic details for maximum realism: "
+            "shot on Canon EOS R5 with 85mm f/1.4 lens, shallow depth of field, "
+            "natural soft window light, realistic detailed skin with visible pores, "
+            "subtle skin texture, fine facial hair, natural skin imperfections, "
+            "catchlights in the eyes, sharp focus on eyes, real fabric texture on clothes, "
+            "professional corporate headshot, head and shoulders, looking at camera, "
+            "warm genuine smile, clean softly blurred office background, "
+            "85mm portrait, ultra-detailed, high resolution, lifelike, "
+            "photojournalistic, candid, raw photo, --style raw.\n"
+            "End the prompt with negative cues to AVOID: "
+            "(no cartoon, no anime, no 3d render, no cgi, no illustration, no painting, "
+            "no plastic skin, no doll, no airbrushed, no uncanny, no deformed face, no extra fingers). "
+            "Output ONLY the final prompt text."
         )
-        extra["max_tokens"] = 400
-        extra["temperature"] = 0.8
+        extra["max_tokens"] = 500
+        extra["temperature"] = 0.7
 
     elif task == "avatar-persona":
         system = SYSTEM_PROMPTS["avatar-json"]

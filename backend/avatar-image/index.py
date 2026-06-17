@@ -15,7 +15,19 @@ import boto3
 import requests
 
 POLZA_IMAGE_URL = "https://api.polza.ai/api/v1/images/generations"
-DEFAULT_MODEL = "openai/gpt-image-1"
+
+# Модели в порядке приоритета фотореализма людей (реальные id каталога Polza.ai).
+# Перебираем по очереди: если модель недоступна/ошибка — пробуем следующую.
+PHOTOREAL_MODELS = [
+    "black-forest-labs/flux.2-pro",
+    "bytedance/seedream-4.5",
+    "google/gemini-3-pro-image-preview",
+    "black-forest-labs/flux.2-flex",
+    "bytedance/seedream-4",
+    "openai/gpt-image-1.5",
+    "openai/gpt-5-image",
+]
+DEFAULT_MODEL = PHOTOREAL_MODELS[0]
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -54,6 +66,7 @@ def handler(event: dict, context: Any) -> dict:
     method = (event.get("httpMethod") or "POST").upper()
     if method == "OPTIONS":
         return _response(200, {"ok": True})
+
     if method != "POST":
         return _response(405, {"error": "Только POST"})
 
@@ -70,30 +83,51 @@ def handler(event: dict, context: Any) -> dict:
     if not prompt:
         return _response(400, {"error": "Пустой промпт"})
 
-    model = body.get("model") or DEFAULT_MODEL
     size = body.get("size") or "1024x1024"
 
-    try:
-        resp = requests.post(
-            POLZA_IMAGE_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={"model": model, "prompt": prompt, "n": 1, "size": size},
-            timeout=180,
-        )
-    except requests.RequestException as exc:
-        return _response(502, {"error": f"Ошибка соединения с ИИ: {exc}"})
+    # Если модель передана явно — используем только её, иначе перебираем фотореалистичные.
+    if body.get("model"):
+        candidates = [body["model"]]
+    else:
+        candidates = PHOTOREAL_MODELS
 
-    if resp.status_code != 200:
+    data = None
+    used_model = None
+    last_error = ""
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    for model in candidates:
+        try:
+            resp = requests.post(
+                POLZA_IMAGE_URL,
+                headers=headers,
+                json={"model": model, "prompt": prompt, "n": 1, "size": size},
+                timeout=180,
+            )
+        except requests.RequestException as exc:
+            last_error = f"Ошибка соединения: {exc}"
+            continue
+
+        if resp.status_code != 200:
+            last_error = f"{model}: {resp.status_code} {resp.text[:200]}"
+            continue
+
+        parsed = resp.json()
+        if parsed.get("data"):
+            data = parsed
+            used_model = model
+            break
+        last_error = f"{model}: пустой ответ"
+
+    if not data:
         return _response(502, {
-            "error": "ИИ вернул ошибку при генерации изображения",
-            "details": resp.text[:500],
-            "status_code": resp.status_code,
+            "error": "Не удалось сгенерировать изображение ни одной моделью",
+            "details": last_error,
         })
 
-    data = resp.json()
     items = data.get("data", [])
     if not items:
         return _response(502, {"error": "ИИ не вернул изображение"})
@@ -118,4 +152,4 @@ def handler(event: dict, context: Any) -> dict:
     except Exception as exc:
         return _response(500, {"error": f"Ошибка сохранения в хранилище: {exc}"})
 
-    return _response(200, {"success": True, "image_url": cdn_url})
+    return _response(200, {"success": True, "image_url": cdn_url, "model": used_model})
