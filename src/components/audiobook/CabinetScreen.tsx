@@ -66,11 +66,23 @@ export function CabinetScreen({
                 <Icon name="BookOpen" size={20} className="text-[#3b82f6]" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate" style={{ color: "var(--ab-text-primary)" }}>{p.title}</div>
+                <div className="flex items-center gap-1.5">
+                  {p.is_example && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+                      style={{ background: "#3b82f6", color: "#fff" }}>
+                      <Icon name="Sparkles" fallback="Star" size={10} aria-hidden="true" />ПРИМЕР
+                    </span>
+                  )}
+                  <div className="font-semibold truncate" style={{ color: "var(--ab-text-primary)" }}>{p.title}</div>
+                </div>
                 <div className="text-xs mt-0.5" style={{ color: "var(--ab-text-muted)" }}>
-                  <time dateTime={p.created_at}>
-                    {new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-                  </time>
+                  {p.is_example ? (
+                    "Образец — послушайте, как звучит озвучка"
+                  ) : (
+                    <time dateTime={p.created_at}>
+                      {new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                    </time>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -86,14 +98,16 @@ export function CabinetScreen({
                     MP3
                   </a>
                 )}
-                <button
-                  onClick={() => onDeleteProject(p.id)}
-                  className="p-2 rounded-lg transition-all hover:bg-red-50"
-                  style={{ color: "var(--ab-text-muted)" }}
-                  aria-label={`Удалить аудиокнигу "${p.title}"`}
-                >
-                  <Icon name="Trash2" size={14} aria-hidden="true" />
-                </button>
+                {!p.is_example && (
+                  <button
+                    onClick={() => onDeleteProject(p.id)}
+                    className="p-2 rounded-lg transition-all hover:bg-red-50"
+                    style={{ color: "var(--ab-text-muted)" }}
+                    aria-label={`Удалить аудиокнигу "${p.title}"`}
+                  >
+                    <Icon name="Trash2" size={14} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             </li>
           ))}

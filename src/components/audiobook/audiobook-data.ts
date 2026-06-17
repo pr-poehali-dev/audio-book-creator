@@ -272,6 +272,7 @@ export interface Project {
   created_at: string;
   status: string;
   duration_sec?: number;
+  is_example?: boolean;
 }
 
 export const USER_ID = "user_" + (localStorage.getItem("uid") || (() => {

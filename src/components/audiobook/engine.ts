@@ -59,6 +59,7 @@ export interface SavedProject {
   preview?: string;
   created_at: string;
   updated_at: string;
+  is_example?: boolean;
   data?: Record<string, unknown>;
 }
 

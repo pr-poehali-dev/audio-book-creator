@@ -84,12 +84,15 @@ def _handle_get(params: dict) -> dict:
             if not user_id:
                 return _response(400, {"error": "Нужен user_id"})
 
-            where = f"user_id = '{_esc(user_id)}'"
+            # Свои проекты пользователя + закреплённые примеры (видны всем)
+            owner = f"(user_id = '{_esc(user_id)}' OR is_example = true)"
+            where = owner
             if module:
                 where += f" AND module = '{_esc(module)}'"
             cur.execute(
-                f"SELECT id, user_id, module, title, preview, created_at, updated_at "
-                f"FROM {TABLE} WHERE {where} ORDER BY updated_at DESC LIMIT 100"
+                f"SELECT id, user_id, module, title, preview, is_example, created_at, updated_at "
+                f"FROM {TABLE} WHERE {where} "
+                f"ORDER BY is_example DESC, updated_at DESC LIMIT 100"
             )
             rows = cur.fetchall()
             return _response(200, {"projects": [dict(r) for r in rows]})
@@ -147,10 +150,13 @@ def _handle_delete(params: dict) -> dict:
     try:
         with conn:
             with conn.cursor() as cur:
-                cur.execute(f"DELETE FROM {TABLE} WHERE id = '{_esc(project_id)}'")
+                cur.execute(
+                    f"DELETE FROM {TABLE} "
+                    f"WHERE id = '{_esc(project_id)}' AND is_example = false"
+                )
                 deleted = cur.rowcount
         if deleted == 0:
-            return _response(404, {"error": "Проект не найден"})
+            return _response(404, {"error": "Проект не найден или это пример"})
         return _response(200, {"success": True, "deleted_id": project_id})
     finally:
         conn.close()

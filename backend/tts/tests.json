@@ -7,12 +7,10 @@
       "expectedStatus": 200
     },
     {
-      "name": "Get projects empty list",
+      "name": "Get projects list",
       "method": "GET",
       "path": "/?user_id=test_user_123",
-      "expectedStatus": 200,
-      "expectedBody": {"projects": []},
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     }
   ]
 }

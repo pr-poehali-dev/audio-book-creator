@@ -271,10 +271,10 @@ def _handle_get(query_params: dict) -> dict:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, title, status, audio_url, created_at, duration_sec
+                    SELECT id, title, status, audio_url, created_at, duration_sec, is_example
                     FROM t_p29363705_audio_book_creator.projects
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
+                    WHERE user_id = %s OR is_example = true
+                    ORDER BY is_example DESC, created_at DESC
                     """,
                     (user_id,),
                 )
@@ -306,7 +306,7 @@ def _handle_delete(query_params: dict) -> dict:
                 cur.execute(
                     """
                     DELETE FROM t_p29363705_audio_book_creator.projects
-                    WHERE id = %s
+                    WHERE id = %s AND is_example = false
                     """,
                     (project_id,),
                 )
