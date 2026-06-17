@@ -2,40 +2,22 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Screen } from "@/components/audiobook/audiobook-data";
 import { useAI, useSave, useTTS, SavedProject } from "@/components/audiobook/engine";
-import { AIButton, SaveStatus, MiniPlayer, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
+import { SaveStatus, ErrorToast, ProjectsDrawer } from "@/components/audiobook/EngineUI";
+import {
+  AB_COLOR, Segment, Question, StructureItem, QuestionItem,
+  SEGMENT_TYPES, FORMATS,
+} from "@/components/audiobook/podcast-data";
+import { PodcastSetupStep } from "@/components/audiobook/PodcastSetupStep";
+import { PodcastStructureStep } from "@/components/audiobook/PodcastStructureStep";
+import { PodcastQuestionsStep } from "@/components/audiobook/PodcastQuestionsStep";
 
 interface Props { setScreen: (s: Screen) => void; }
-
-const AB_COLOR = "#10b981";
-
-interface Segment { id: string; type: string; title: string; duration: string; notes: string; }
-interface Question { id: string; text: string; followUp: string; }
-
-interface StructureItem { type?: string; title?: string; duration?: string; notes?: string; }
-interface QuestionItem { text?: string; followUp?: string; }
-
-const SEGMENT_TYPES = [
-  { id: "intro", label: "Интро", color: "#3b82f6", icon: "Play" },
-  { id: "topic", label: "Тема", color: "#10b981", icon: "MessageSquare" },
-  { id: "interview", label: "Интервью", color: "#8b5cf6", icon: "Mic" },
-  { id: "story", label: "История", color: "#f59e0b", icon: "BookOpen" },
-  { id: "tips", label: "Советы", color: "#ec4899", icon: "Lightbulb" },
-  { id: "outro", label: "Аутро", color: "#64748b", icon: "StopCircle" },
-];
-
-const FORMATS = [
-  { id: "solo", label: "Соло", desc: "Один ведущий, монолог" },
-  { id: "duo", label: "Диалог", desc: "Два ведущих" },
-  { id: "interview", label: "Интервью", desc: "Ведущий + гость" },
-  { id: "panel", label: "Панель", desc: "Несколько участников" },
-];
 
 export function PodcastScreen({ setScreen }: Props) {
   const [step, setStep] = useState<"setup" | "structure" | "questions">("setup");
   const [episodeTitle, setEpisodeTitle] = useState("");
   const [podcastName, setPodcastName] = useState("");
   const [format, setFormat] = useState("solo");
-  const [targetAudience, setTargetAudience] = useState("");
   const [mainIdea, setMainIdea] = useState("");
   const [guestName, setGuestName] = useState("");
   const [segments, setSegments] = useState<Segment[]>([
@@ -250,253 +232,44 @@ export function PodcastScreen({ setScreen }: Props) {
 
       {/* STEP 1: Setup */}
       {step === "setup" && (
-        <div className="flex flex-col gap-6 animate-fade-in">
-          <div className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Название подкаста</label>
-                <input value={podcastName} onChange={e => setPodcastName(e.target.value)}
-                  placeholder="«Разговоры о главном»…"
-                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                  style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                  onFocus={e => (e.currentTarget.style.borderColor = "#10b981")}
-                  onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Тема эпизода</label>
-                <input value={episodeTitle} onChange={e => setEpisodeTitle(e.target.value)}
-                  placeholder="«Как перестать бояться провала»…"
-                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                  style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                  onFocus={e => (e.currentTarget.style.borderColor = "#10b981")}
-                  onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Главная мысль эпизода</label>
-              <textarea value={mainIdea} onChange={e => setMainIdea(e.target.value)}
-                placeholder="Что слушатель должен вынести из этого эпизода?"
-                rows={2} className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
-                style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                onFocus={e => (e.currentTarget.style.borderColor = "#10b981")}
-                onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-            </div>
-            {(format === "interview" || format === "panel") && (
-              <div>
-                <label className="text-sm font-medium mb-2 block" style={{ color: "var(--ab-text-secondary)" }}>Имя гостя / экспертиза</label>
-                <input value={guestName} onChange={e => setGuestName(e.target.value)}
-                  placeholder="Иван Петров — психолог, коуч…"
-                  className="w-full px-4 py-3 rounded-xl text-sm focus:outline-none"
-                  style={{ background: "var(--ab-page-bg)", border: "2px solid var(--ab-border)", color: "var(--ab-text-primary)" }}
-                  onFocus={e => (e.currentTarget.style.borderColor = "#10b981")}
-                  onBlur={e => (e.currentTarget.style.borderColor = "var(--ab-border)")} />
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="text-sm font-medium mb-3" style={{ color: "var(--ab-text-secondary)" }}>Формат записи</div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {FORMATS.map(f => (
-                <button key={f.id} onClick={() => setFormat(f.id)}
-                  className="rounded-xl p-4 text-center transition-all"
-                  style={format === f.id
-                    ? { background: "rgba(16,185,129,0.12)", border: "2px solid rgba(16,185,129,0.5)" }
-                    : { background: "var(--ab-card)", border: "2px solid var(--ab-border)" }}>
-                  <div className="font-semibold text-sm mb-1" style={{ color: "var(--ab-text-primary)" }}>{f.label}</div>
-                  <div className="text-xs" style={{ color: "var(--ab-text-secondary)" }}>{f.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button onClick={() => setStep("structure")} disabled={!episodeTitle.trim()}
-              className="flex-1 py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90 disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>
-              Составить структуру →
-            </button>
-            <AIButton
-              onClick={generateStructure}
-              loading={aiLoading && loadingTask === "podcast-structure"}
-              disabled={!episodeTitle.trim()}
-              label="Сгенерировать структуру ИИ"
-              color={AB_COLOR}
-            />
-          </div>
-        </div>
+        <PodcastSetupStep
+          podcastName={podcastName} setPodcastName={setPodcastName}
+          episodeTitle={episodeTitle} setEpisodeTitle={setEpisodeTitle}
+          mainIdea={mainIdea} setMainIdea={setMainIdea}
+          format={format} setFormat={setFormat}
+          guestName={guestName} setGuestName={setGuestName}
+          setStep={setStep}
+          generateStructure={generateStructure}
+          aiLoading={aiLoading} loadingTask={loadingTask}
+        />
       )}
 
       {/* STEP 2: Structure */}
       {step === "structure" && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="flex flex-wrap gap-2 mb-2">
-            {SEGMENT_TYPES.map(t => (
-              <button key={t.id} onClick={() => addSegment(t.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:opacity-80"
-                style={{ background: `${t.color}15`, color: t.color, border: `1px solid ${t.color}30` }}>
-                <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} fallback="Plus" size={12} />
-                + {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-4">
-            {/* Timeline */}
-            <div className="flex flex-col gap-2">
-              {segments.map((seg, i) => {
-                const t = SEGMENT_TYPES.find(x => x.id === seg.type)!;
-                return (
-                  <button key={seg.id} onClick={() => setActiveSegment(seg.id)}
-                    className="p-3 rounded-xl text-left transition-all flex items-center gap-3"
-                    style={activeSegment === seg.id
-                      ? { background: `${t.color}15`, border: `2px solid ${t.color}50` }
-                      : { background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                    <span className="text-xs font-bold w-5 text-center" style={{ color: t.color }}>{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold truncate" style={{ color: "var(--ab-text-primary)" }}>{seg.title}</div>
-                      <div className="text-[10px]" style={{ color: "var(--ab-text-secondary)" }}>{t.label} · {seg.duration}</div>
-                    </div>
-                    <button onClick={e => { e.stopPropagation(); setSegments(s => s.filter(x => x.id !== seg.id)); }}
-                      disabled={segments.length <= 1}
-                      className="opacity-30 hover:opacity-100 transition-opacity"
-                      style={{ color: "var(--ab-text-secondary)" }}>
-                      <Icon name="X" size={12} />
-                    </button>
-                  </button>
-                );
-              })}
-              <div className="px-3 py-2 rounded-xl text-xs font-medium text-center"
-                style={{ background: "rgba(16,185,129,0.08)", color: "#10b981" }}>
-                Итого: ~{totalMin}:{String(totalSec).padStart(2, "0")} мин
-              </div>
-            </div>
-
-            {/* Segment editor */}
-            {currentSeg && (() => {
-              const t = SEGMENT_TYPES.find(x => x.id === currentSeg.type)!;
-              return (
-                <div className="lg:col-span-2 rounded-2xl overflow-hidden" style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-                  <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--ab-border)" }}>
-                    <span className="text-xs font-bold px-2 py-1 rounded-full"
-                      style={{ background: `${t.color}15`, color: t.color }}>{t.label}</span>
-                    <input value={currentSeg.title}
-                      onChange={e => setSegments(s => s.map(x => x.id === currentSeg.id ? { ...x, title: e.target.value } : x))}
-                      className="flex-1 font-semibold text-sm bg-transparent focus:outline-none"
-                      style={{ color: "var(--ab-text-primary)" }} />
-                    <input value={currentSeg.duration}
-                      onChange={e => setSegments(s => s.map(x => x.id === currentSeg.id ? { ...x, duration: e.target.value } : x))}
-                      className="w-16 text-center text-sm bg-transparent focus:outline-none rounded px-2 py-1"
-                      style={{ color: t.color, border: `1px solid ${t.color}30`, background: `${t.color}08` }} />
-                  </div>
-                  <div className="p-5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium block" style={{ color: "var(--ab-text-secondary)" }}>Заметки и тезисы</label>
-                      <AIButton
-                        onClick={() => generateSegmentScript(currentSeg)}
-                        loading={aiLoading && loadingTask === "podcast-script"}
-                        label="Написать блок ИИ"
-                        color={AB_COLOR}
-                        size="sm"
-                        variant="ghost"
-                      />
-                    </div>
-                    <textarea value={currentSeg.notes}
-                      onChange={e => setSegments(s => s.map(x => x.id === currentSeg.id ? { ...x, notes: e.target.value } : x))}
-                      placeholder={
-                        currentSeg.type === "intro" ? "Приветствие, о чём будем говорить сегодня…" :
-                        currentSeg.type === "outro" ? "Призыв к действию, анонс следующего эпизода…" :
-                        "Ключевые тезисы, факты, цифры, примеры…"
-                      }
-                      rows={8}
-                      className="w-full bg-transparent focus:outline-none text-sm leading-relaxed resize-none"
-                      style={{ color: "var(--ab-text-primary)" }} />
-                    <div className="flex justify-start">
-                      <AIButton
-                        onClick={() => voiceSegment(currentSeg)}
-                        loading={voicing}
-                        label="Озвучить блок"
-                        color={AB_COLOR}
-                        size="sm"
-                        variant="ghost"
-                      />
-                    </div>
-                    {audioUrl && (
-                      <MiniPlayer
-                        url={audioUrl}
-                        title={`${episodeTitle || "Эпизод"} — ${currentSeg.title}`}
-                        color={AB_COLOR}
-                        onClose={() => setAudioUrl("")}
-                      />
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={() => setStep("setup")} className="flex-1 py-3 rounded-xl font-medium"
-              style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "1px solid var(--ab-border)" }}>← Назад</button>
-            <button onClick={() => setStep("questions")} className="flex-2 px-8 py-3 rounded-xl text-white font-bold hover:opacity-90"
-              style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>
-              {format === "interview" ? "Вопросы гостю →" : "Готово →"}
-            </button>
-          </div>
-        </div>
+        <PodcastStructureStep
+          segments={segments} setSegments={setSegments}
+          activeSegment={activeSegment} setActiveSegment={setActiveSegment}
+          addSegment={addSegment}
+          totalMin={totalMin} totalSec={totalSec}
+          currentSeg={currentSeg}
+          episodeTitle={episodeTitle} format={format}
+          setStep={setStep}
+          generateSegmentScript={generateSegmentScript}
+          voiceSegment={voiceSegment}
+          aiLoading={aiLoading} loadingTask={loadingTask} voicing={voicing}
+          audioUrl={audioUrl} setAudioUrl={setAudioUrl}
+        />
       )}
 
       {/* STEP 3: Questions */}
       {step === "questions" && (
-        <div className="flex flex-col gap-4 animate-fade-in">
-          <div className="rounded-2xl p-5 mb-2 flex items-center justify-between gap-3 flex-wrap"
-            style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
-            <div className="text-sm font-medium" style={{ color: "#10b981" }}>
-              {guestName ? `Вопросы для ${guestName}` : "Вопросы и план беседы"}
-            </div>
-            <AIButton
-              onClick={generateQuestions}
-              loading={aiLoading && loadingTask === "podcast-questions"}
-              label="Сгенерировать вопросы ИИ"
-              color={AB_COLOR}
-              size="sm"
-            />
-          </div>
-          {questions.map((q, i) => (
-            <div key={q.id} className="rounded-2xl p-5 flex flex-col gap-3"
-              style={{ background: "var(--ab-card)", border: "1px solid var(--ab-border)" }}>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-1"
-                  style={{ background: "#10b981" }}>{i + 1}</span>
-                <textarea value={q.text}
-                  onChange={e => setQuestions(qs => qs.map(x => x.id === q.id ? { ...x, text: e.target.value } : x))}
-                  placeholder="Основной вопрос…"
-                  rows={2} className="flex-1 bg-transparent text-sm focus:outline-none resize-none"
-                  style={{ color: "var(--ab-text-primary)" }} />
-                <button onClick={() => setQuestions(qs => qs.filter(x => x.id !== q.id))}
-                  disabled={questions.length <= 1} className="opacity-40 hover:opacity-100 transition-opacity mt-1"
-                  style={{ color: "var(--ab-text-secondary)" }}>
-                  <Icon name="X" size={14} />
-                </button>
-              </div>
-              <input value={q.followUp}
-                onChange={e => setQuestions(qs => qs.map(x => x.id === q.id ? { ...x, followUp: e.target.value } : x))}
-                placeholder="Уточняющий вопрос…"
-                className="w-full ml-9 text-xs bg-transparent focus:outline-none border-l-2 pl-3"
-                style={{ borderColor: "rgba(16,185,129,0.3)", color: "var(--ab-text-secondary)" }} />
-            </div>
-          ))}
-          <button onClick={() => setQuestions(qs => [...qs, { id: String(Date.now()), text: "", followUp: "" }])}
-            className="py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
-            style={{ background: "var(--ab-card)", color: "var(--ab-text-secondary)", border: "2px dashed var(--ab-border)" }}>
-            <Icon name="Plus" size={14} />Добавить вопрос
-          </button>
-          <button onClick={exportNotes}
-            className="w-full py-4 rounded-2xl text-white font-bold text-base transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg,#10b981,#0d9488)" }}>
-            <span className="flex items-center justify-center gap-2"><Icon name="Download" size={18} />Скачать подготовку к эпизоду</span>
-          </button>
-        </div>
+        <PodcastQuestionsStep
+          questions={questions} setQuestions={setQuestions}
+          guestName={guestName}
+          generateQuestions={generateQuestions}
+          exportNotes={exportNotes}
+          aiLoading={aiLoading} loadingTask={loadingTask}
+        />
       )}
 
       <ErrorToast
