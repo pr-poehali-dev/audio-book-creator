@@ -58,6 +58,9 @@ def _response(status: int, body: Any, extra_headers: dict | None = None) -> dict
 
 def _get_db_conn():
     """Возвращает подключение к PostgreSQL, используя переменные окружения."""
+    database_url = os.environ.get("DATABASE_URL", "")
+    if database_url:
+        return psycopg2.connect(database_url, connect_timeout=10)
     return psycopg2.connect(
         host=os.environ.get("DB_HOST", "localhost"),
         port=int(os.environ.get("DB_PORT", 5432)),
@@ -72,7 +75,7 @@ def _get_s3_client():
     """Возвращает клиент boto3 для работы с S3-совместимым хранилищем."""
     return boto3.client(
         "s3",
-        endpoint_url=os.environ.get("AWS_ENDPOINT_URL", "https://s3.poehali.dev"),
+        endpoint_url="https://bucket.poehali.dev",
         aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", ""),
         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
         region_name=os.environ.get("AWS_REGION", "us-east-1"),
