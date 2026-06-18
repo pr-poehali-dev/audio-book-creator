@@ -121,6 +121,63 @@ export function HomeScreen({ setScreen, onLoadCabinet, onSelectBook }: HomeScree
         </div>
       </section>
 
+      {/* ── Плашка «Готовые примеры» ─────────────────────────────────────────── */}
+      <section className="px-6 pb-16 max-w-6xl mx-auto">
+        <div
+          className="relative overflow-hidden rounded-3xl p-8 md:p-10"
+          style={{
+            background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(236,72,153,0.1), rgba(245,158,11,0.1))",
+            border: "1px solid var(--ab-border)",
+          }}
+        >
+          <div className="absolute -top-10 -right-10 w-52 h-52 rounded-full blur-3xl opacity-30 pointer-events-none"
+            style={{ background: "radial-gradient(circle, #6366f1, transparent 70%)" }} />
+          <div className="relative">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                style={{ background: "linear-gradient(135deg,#6366f1,#ec4899)" }}>
+                <Icon name="Sparkles" fallback="Star" size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold mb-1" style={{ color: "var(--ab-text-primary)" }}>
+                  Посмотрите готовый пример
+                </h2>
+                <p className="text-base" style={{ color: "var(--ab-text-secondary)" }}>
+                  В каждом инструменте есть образец отличного качества — откройте, изучите и создайте своё на его основе
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {CREATIVE_MODULES.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setScreen(m.id)}
+                  className="flex flex-col items-center gap-2 rounded-2xl px-3 py-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  style={{ background: "var(--ab-card)", border: `1px solid ${m.color}30` }}
+                >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: `${m.color}18` }}>
+                    <Icon
+                      name={m.icon as Parameters<typeof Icon>[0]["name"]}
+                      fallback="Star"
+                      size={20}
+                      style={{ color: m.color }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-center leading-tight" style={{ color: "var(--ab-text-primary)" }}>
+                    {m.label}
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: `${m.color}15`, color: m.color }}>
+                    <Icon name="Eye" size={10} />Пример
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Каталог классики ─────────────────────────────────────────────────── */}
       <ClassicsSection onSelectBook={(text, title) => { onSelectBook(text, title); setScreen("editor"); }} />
 
