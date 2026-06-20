@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
-import { Persona, ChatMsg, LeadAnalysis } from "@/components/audiobook/AvatarScreen";
+import { Persona, ChatMsg, LeadAnalysis, ExpressionMap, Emotion } from "@/components/audiobook/AvatarScreen";
 import { useSpeechInput } from "@/components/audiobook/engine";
 import { AvatarSpeakingHead } from "@/components/audiobook/AvatarSpeakingHead";
 import { AvatarLeadPanel } from "@/components/audiobook/AvatarLeadPanel";
@@ -18,6 +18,7 @@ interface Props {
   sendMessage: (message: string) => void;
   voiceText: (txt: string, label: string) => void;
   avatarUrl: string;
+  expressions?: ExpressionMap;
   autoVoice: boolean;
   setAutoVoice: (v: boolean) => void;
   speakingIdx: number | null;
@@ -30,7 +31,7 @@ interface Props {
 
 export function AvatarChatStep({
   persona, chat, setChat, loading, loadingTask, voicing, audioUrl, setAudioUrl,
-  sendMessage, voiceText, avatarUrl, autoVoice, setAutoVoice,
+  sendMessage, voiceText, avatarUrl, expressions, autoVoice, setAutoVoice,
   speakingIdx, setSpeakingIdx, lead, analyzeLead, hasKnowledge, color,
 }: Props) {
   const [input, setInput] = useState("");
@@ -63,10 +64,17 @@ export function AvatarChatStep({
 
   const isSpeaking = speakingIdx !== null;
 
+  // Текущая эмоция: у говорящего сообщения, иначе у последнего ответа аватара
+  const currentEmotion: Emotion =
+    (speakingIdx !== null ? chat[speakingIdx]?.emotion : undefined) ||
+    [...chat].reverse().find(m => m.from === "avatar")?.emotion ||
+    "neutral";
+
   return (
     <div className="flex flex-col gap-4 animate-fade-in">
       {/* Говорящий аватар */}
-      <AvatarSpeakingHead persona={persona} avatarUrl={avatarUrl} isSpeaking={isSpeaking} color={color} />
+      <AvatarSpeakingHead persona={persona} avatarUrl={avatarUrl} isSpeaking={isSpeaking}
+        color={color} emotion={currentEmotion} expressions={expressions} />
 
       {/* Тумблеры */}
       <div className="flex items-center justify-between gap-2 flex-wrap">

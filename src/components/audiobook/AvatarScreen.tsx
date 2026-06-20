@@ -8,7 +8,7 @@ import { AvatarLookStep } from "@/components/audiobook/AvatarLookStep";
 import { AvatarScriptsStep } from "@/components/audiobook/AvatarScriptsStep";
 import { AvatarChatStep } from "@/components/audiobook/AvatarChatStep";
 
-export type { Persona, FaqItem, ChatMsg, LeadAnalysis } from "@/components/audiobook/avatar-types";
+export type { Persona, FaqItem, ChatMsg, LeadAnalysis, Emotion, ExpressionMap } from "@/components/audiobook/avatar-types";
 
 interface Props { setScreen: (s: Screen) => void; }
 
@@ -43,6 +43,7 @@ export function AvatarScreen({ setScreen }: Props) {
           voiceId={s.voiceId} setVoiceId={s.setVoiceId}
           avatarUrl={s.avatarUrl} setAvatarUrl={s.setAvatarUrl}
           avatarVariants={s.avatarVariants}
+          expressions={s.expressions}
           generating={s.generating}
           genAvatar={s.genAvatar}
           genAvatarOne={s.genAvatarOne}
@@ -73,7 +74,7 @@ export function AvatarScreen({ setScreen }: Props) {
           loading={s.loading} loadingTask={s.loadingTask}
           voicing={s.voicing} audioUrl={s.audioUrl} setAudioUrl={s.setAudioUrl}
           sendMessage={s.sendMessage} voiceText={s.voiceText}
-          avatarUrl={s.avatarUrl}
+          avatarUrl={s.avatarUrl} expressions={s.expressions}
           autoVoice={s.autoVoice} setAutoVoice={s.setAutoVoice}
           speakingIdx={s.speakingIdx} setSpeakingIdx={s.setSpeakingIdx}
           lead={s.lead} analyzeLead={s.analyzeLead}

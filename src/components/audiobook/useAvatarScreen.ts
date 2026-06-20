@@ -2,7 +2,7 @@ import { useState } from "react";
 import { VOICES, AVATAR_TONES } from "@/components/audiobook/audiobook-data";
 import { useAI, useSave, useTTS, useAvatarImage, SavedProject } from "@/components/audiobook/engine";
 import { downloadAvatarCard } from "@/components/audiobook/avatar-export";
-import { Persona, FaqItem, ChatMsg, LeadAnalysis } from "@/components/audiobook/avatar-types";
+import { Persona, FaqItem, ChatMsg, LeadAnalysis, ExpressionMap, detectEmotion } from "@/components/audiobook/avatar-types";
 
 export function useAvatarScreen() {
   const [step, setStep] = useState<"look" | "scripts" | "chat">("look");
@@ -16,6 +16,7 @@ export function useAvatarScreen() {
   const [voiceId, setVoiceId] = useState("alena");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarVariants, setAvatarVariants] = useState<string[]>([]);
+  const [expressions, setExpressions] = useState<ExpressionMap>({});
   const [knowledge, setKnowledge] = useState("");
 
   // ── Сгенерированный контент ───────────────────────────────────────────────
@@ -113,13 +114,14 @@ export function useAvatarScreen() {
     });
     if (r?.text) {
       const replyText = r.text;
+      const emotion = detectEmotion(replyText);
       let replyAudio = "";
       if (autoVoice) {
         const url = await voice(replyText, `${persona?.name || "Аватар"} — ответ`, voiceId, 1.0);
         if (url) replyAudio = url;
       }
       setChat(c => {
-        const next = [...c, { from: "avatar" as const, text: replyText, audioUrl: replyAudio }];
+        const next = [...c, { from: "avatar" as const, text: replyText, audioUrl: replyAudio, emotion }];
         if (replyAudio) {
           const idx = next.length - 1;
           setSpeakingIdx(idx);
@@ -142,7 +144,7 @@ export function useAvatarScreen() {
 
   // ── Сохранение / загрузка ─────────────────────────────────────────────────
   const handleSave = async () => {
-    const data = { gender, appearance, industry, product, tone, voiceId, avatarUrl, avatarVariants, knowledge, persona, pitch, faq };
+    const data = { gender, appearance, industry, product, tone, voiceId, avatarUrl, avatarVariants, expressions, knowledge, persona, pitch, faq, chat };
     const preview = (persona?.role || product || appearance).slice(0, 200);
     const id = await save(projectId, persona?.name || product || "Аватар-продавец", data, preview);
     if (id) setProjectId(id);
@@ -170,8 +172,8 @@ export function useAvatarScreen() {
       const d = p.data as {
         gender: "Женский" | "Мужской"; appearance: string; industry: string;
         product: string; tone: string; voiceId: string; avatarUrl: string;
-        avatarVariants?: string[]; knowledge?: string;
-        persona: Persona | null; pitch: string; faq: FaqItem[];
+        avatarVariants?: string[]; expressions?: ExpressionMap; knowledge?: string;
+        persona: Persona | null; pitch: string; faq: FaqItem[]; chat?: ChatMsg[];
       };
       setGender(d.gender || "Женский");
       setAppearance(d.appearance || "");
@@ -181,10 +183,12 @@ export function useAvatarScreen() {
       setVoiceId(d.voiceId || "alena");
       setAvatarUrl(d.avatarUrl || "");
       setAvatarVariants(d.avatarVariants || []);
+      setExpressions(d.expressions || {});
       setKnowledge(d.knowledge || "");
       setPersona(d.persona || null);
       setPitch(d.pitch || "");
       setFaq(d.faq || []);
+      setChat(d.chat || []);
       setProjectId(id);
       setStep("look");
     }
@@ -200,7 +204,7 @@ export function useAvatarScreen() {
     // настройки
     gender, setGender, appearance, setAppearance, industry, setIndustry,
     product, setProduct, tone, setTone, voiceId, setVoiceId,
-    avatarUrl, setAvatarUrl, avatarVariants, knowledge, setKnowledge,
+    avatarUrl, setAvatarUrl, avatarVariants, expressions, setExpressions, knowledge, setKnowledge,
     // контент
     persona, pitch, setPitch, faq, chat, setChat,
     // усиления

@@ -100,6 +100,10 @@ export default {
         'shimmer': {
           '0%': { backgroundPosition: '-200% center' },
           '100%': { backgroundPosition: '200% center' }
+        },
+        'breathe': {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.03)' }
         }
       },
       animation: {
@@ -110,6 +114,7 @@ export default {
         'slide-in-right': 'slide-in-right 0.35s ease forwards',
         'pulse-glow': 'pulse-glow 2.5s ease-in-out infinite',
         'shimmer': 'shimmer 3s linear infinite',
+        'breathe': 'breathe 2.5s ease-in-out infinite',
       }
     }
   },

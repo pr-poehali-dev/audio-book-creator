@@ -1,5 +1,6 @@
 import Icon from "@/components/ui/icon";
 import { AIButton } from "@/components/audiobook/EngineUI";
+import { ExpressionMap, EMOTIONS } from "@/components/audiobook/avatar-types";
 
 interface Props {
   gender: "Женский" | "Мужской";
@@ -9,6 +10,7 @@ interface Props {
   avatarUrl: string;
   setAvatarUrl: (v: string) => void;
   avatarVariants: string[];
+  expressions?: ExpressionMap;
   generating: boolean;
   genAvatar: () => void;
   genAvatarOne: () => void;
@@ -17,8 +19,9 @@ interface Props {
 
 export function AvatarLookPreview({
   gender, setGender, appearance, setAppearance,
-  avatarUrl, setAvatarUrl, avatarVariants, generating, genAvatar, genAvatarOne, color,
+  avatarUrl, setAvatarUrl, avatarVariants, expressions = {}, generating, genAvatar, genAvatarOne, color,
 }: Props) {
+  const expressionList = EMOTIONS.filter(e => expressions[e.id]);
   return (
     <div className="grid md:grid-cols-2 gap-6">
       {/* Левая колонка — превью аватара */}
@@ -54,6 +57,31 @@ export function AvatarLookPreview({
                 <img src={url} alt={`Вариант ${i + 1}`} className="w-full h-full object-cover" />
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Мимика и эмоции */}
+        {expressionList.length > 0 && (
+          <div className="w-full">
+            <div className="flex items-center justify-center gap-1.5 mb-2 text-xs font-medium" style={{ color: "var(--ab-text-secondary)" }}>
+              <Icon name="Smile" size={13} style={{ color } as React.CSSProperties} />
+              Мимика и эмоции
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              {expressionList.map(e => (
+                <button key={e.id} onClick={() => setAvatarUrl(expressions[e.id]!)}
+                  className="flex flex-col items-center gap-1 transition-all"
+                  title={e.label}>
+                  <div className="w-14 h-14 rounded-xl overflow-hidden transition-all"
+                    style={{ border: avatarUrl === expressions[e.id] ? `3px solid ${color}` : "2px solid var(--ab-border)" }}>
+                    <img src={expressions[e.id]} alt={e.label} className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[10px] leading-none flex items-center gap-0.5" style={{ color: "var(--ab-text-secondary)" }}>
+                    <span>{e.emoji}</span>{e.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { AvatarLookPreview } from "@/components/audiobook/AvatarLookPreview";
 import { AvatarBusinessFields } from "@/components/audiobook/AvatarBusinessFields";
 import { AvatarToneVoice } from "@/components/audiobook/AvatarToneVoice";
+import { ExpressionMap } from "@/components/audiobook/avatar-types";
 
 type Step = "look" | "scripts" | "chat";
 
@@ -25,6 +26,7 @@ interface Props {
   avatarUrl: string;
   setAvatarUrl: (v: string) => void;
   avatarVariants: string[];
+  expressions?: ExpressionMap;
   generating: boolean;
   genAvatar: () => void;
   genAvatarOne: () => void;
@@ -38,7 +40,7 @@ interface Props {
 export function AvatarLookStep({
   gender, setGender, appearance, setAppearance, industry, setIndustry,
   product, setProduct, knowledge, setKnowledge, tone, setTone, voiceId, setVoiceId,
-  avatarUrl, setAvatarUrl, avatarVariants, generating, genAvatar, genAvatarOne,
+  avatarUrl, setAvatarUrl, avatarVariants, expressions, generating, genAvatar, genAvatarOne,
   industries, tones, voices, color, setStep,
 }: Props) {
   return (
@@ -48,6 +50,7 @@ export function AvatarLookStep({
         appearance={appearance} setAppearance={setAppearance}
         avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl}
         avatarVariants={avatarVariants}
+        expressions={expressions}
         generating={generating}
         genAvatar={genAvatar} genAvatarOne={genAvatarOne}
         color={color}
